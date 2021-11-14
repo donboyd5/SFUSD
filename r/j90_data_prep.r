@@ -97,54 +97,62 @@ library(btools)
 j90dir <- r"(E:\data\CA_j90/)"
 
 
-# for each section, combine all years ----------------------
+# logical expressions -----------------------------------------------------
 
-get_yearsec <- function(year, section) {
+sfusd <- expression(ccode==38 & dcode==68478)
+
+
+# for each file number, combine all years ----------------------
+
+get_yearfile <- function(year, file) {
   print(year)
-  print(section)
+  print(file)
   indir <- paste0(j90dir, "data/", year, "/")
-  fname <- paste0("tsal", section, str_sub(year, 3, 4), ".rds")
+  fname <- paste0("tsal", file, str_sub(year, 3, 4), ".rds")
   fpath <- paste0(indir, fname)
   df <- readRDS(fpath) %>%
-    mutate(year=!!year)
+    mutate(year=!!year) %>%
+    as_tibble()
   df
 }
 
 
-savesec <- function(years, section){
+savefile <- function(years, file){
   outdir <- paste0(j90dir, "data/allyears/")
-  outfname <- paste0("tsal_sec", section, ".rds")
+  outfname <- paste0("tsal_file", file, ".rds")
   outpath <- paste0(outdir, outfname)
   print(outpath)
-  df <- purrr::map_dfr(years, get_yearsec, section)
+  df <- purrr::map_dfr(years, get_yearfile, file)
   saveRDS(df, file=outpath)
 }
 
 
-for(section in 1:6) savesec(2016:2020, section)
+for(file in 1:6) savefile(2016:2020, file)
 
 
 # check to make sure files appear ok ----
-for(section in 1:6) {
-  ycount <- count(readRDS(paste0(j90dir, "data/allyears/", "tsal_sec", section, ".rds")), year)
-  print(section)
+for(file in 1:6) {
+  ycount <- count(readRDS(paste0(j90dir, "data/allyears/", "tsal_file", file, ".rds")), year)
+  print(file)
   print(ycount)
 }
-count(readRDS(paste0(j90dir, "data/allyears/", "tsal_sec1.rds")), year)
+count(readRDS(paste0(j90dir, "data/allyears/", "tsal_file1.rds")), year)
 
 
 # make merged opeb-focused analytic file -----------------------------------------------
 #.. get all the data ----
 ddir <- paste0(j90dir, "data/allyears/")
-sec1 <- readRDS(paste0(ddir, "tsal_sec1.rds"))
-sec2 <- readRDS(paste0(ddir, "tsal_sec2.rds"))
-sec3 <- readRDS(paste0(ddir, "tsal_sec3.rds"))
-sec4 <- readRDS(paste0(ddir, "tsal_sec4.rds"))
-sec5 <- readRDS(paste0(ddir, "tsal_sec5.rds"))
-sec6 <- readRDS(paste0(ddir, "tsal_sec6.rds"))
+file1 <- readRDS(paste0(ddir, "tsal_file1.rds"))  # 1 rec per district per year
+file2 <- readRDS(paste0(ddir, "tsal_file2.rds"))
+file3 <- readRDS(paste0(ddir, "tsal_file3.rds"))
+file4 <- readRDS(paste0(ddir, "tsal_file4.rds"))
+file5 <- readRDS(paste0(ddir, "tsal_file5.rds"))
+file6 <- readRDS(paste0(ddir, "tsal_file6.rds"))
+
+#   setNames(str_replace(names(.), "ts1_", "")) # drop prefixes?
 
 #.. create an id file that we can merge against others ----
-glimpse(sec1)
+glimpse(file1)
 # County	C 2	J-90	Two digit county code
 # District	C 5	J-90	Five digit district Code
 # CDS	C 7	J-90	Seven digit combined code - Note this is the code used as a key for all records in system
@@ -152,18 +160,29 @@ glimpse(sec1)
 # TS1_County	C 18	Master	County Name
 # TS1_Type	C 1	Master	0=COE, 1=Elementary, 2=High School, 4=Unified, 3=Common Admin District
 # TS1_ADA	N 7	Master	The current P-2 ADA
-ids <- sec1 %>%
+
+# TS1_totfte	N 10.2	J-90	The number of full time teachers on salary schedule.
+ids <- file1 %>%
   select(year, ccode=county, dcode=district, dname=ts1_dname, county=ts1_county,
-         type=ts1_type, ada=ts1_ada) %>%
-  mutate(typef=factor(type, levels=0:4,
-                      labels=c("COE", "Elementary", "High School", "Common Admin District", "Unified"))) %>%
-  select(-ada, everything(), ada)
+         dtype=ts1_type, ada=ts1_ada, teachfte=ts1_totfte,
+         # opeb-related items -- documentation given a bit further below
+         ben_life, ben_stop,
+         retire, uretire, liability, studydate) %>%
+  mutate(sfusd=ccode==38 & dcode==68478,  # create an indicator so we don't have to remember codes
+         dtypef=factor(dtype, levels=0:4,
+                      labels=c("COE", "Elementary", "High School", "Common Admin District", "Unified")),
+         dname=str_to_title(dname)) %>%
+  select(year, ccode, dcode, dname, county, dtype, dtypef, everything())
+
 glimpse(ids)
-count(ids, year, type, typef) %>%
-  arrange(type, typef, year)
+count(ids, year, dtype, dtypef) %>%
+  arrange(dtype, dtypef, year)
+ids %>% filter(sfusd)
+
 saveRDS(ids, paste0(ddir, "ids.rds"))
 
-#.. get the health information from sec1 ----
+
+#.. get the health information from file1 MAY NOT USE THIS ----
 # TS1_Note	C 80	J-90	The name of the agency or trust through which the district purchases the health plans
 # TS1_Conf	C 1	Entered	After the district returns the confirmation for to SSC, this field contains a “Y”
 # TS1_Maxcaf	N 8.2	J-90	The maximum annual employer contributions to cafeteria plan
@@ -173,28 +192,117 @@ saveRDS(ids, paste0(ddir, "ids.rds"))
 # TS1_Maxfam	N 8.2	J-90	The maximum annual employer contributions to a family plan per employee.
 # TS1_CAPTYPE	C 2	J-90	Is the cap hard or soft or NA
 
+# The following appear to be opeb related items although they are in the section for current actives
+# Ben_life	C 1	J-90	Does district cover retirees for life? (Y/N)
+# Ben_stop	N 3	J-90	If not for life, when do benefits stop? Age or years
+
+# RETIRE	N 1	J-90	Is benefit plan provided for retired employees over 65
+# URETIRE	N 1	J-90	Is benefit plan provided for retired employees under 65
+
+# LIABILITY	N 13	J-90	Unfunded liability amount reported in actuarial study
+# STUDYDATE	C 10	J-90	Latest actuarial study date
+
+health <-  ids %>%
+  left_join(file1 %>%
+              select(year, ccode=county, dcode=district,
+                     ts1_note:ts1_captype), 
+            by = c("year", "ccode", "dcode"))
+glimpse(health)
+
+health %>% filter(sfusd)
+health %>% filter(str_detect(dname, coll("oakland", ignore_case = TRUE)))
+
+#.. get the opeb data from files 5 and 6 ----
+# file 5 and 6 have the same basic format, but
+#   file 5 is for retirees age 66+ and 
+#   file 6 is for retirees age 65 and under
+
+# each district can have multiple records in a year if they have multiple kinds of plans (health, dental, ...)
+# and/or multiple plans for a given kind of plan
+
+# here are the fields in file 6; file 5 is the same, except that fte is for age 65+
+# County Two digit county code
+# District Five digit district code
+# CDS Seven digit combined code
+# TS6_BenA one character code indicating type of benefit.  H for heath, D for dental, V for vision, L for life, O for other
+# TS6_Desc The name of the plan
+# TS6_Step The health benefit plans ID.  The first is always 1, the second and subsequent like plans are number consequently. This is calculated by the input program
+# TS6_Column A column 1 is always Single, 2 is two party plan, 3 is family plan, 4 is composite rate
+# TS6_Annual The annual cost of plan
+# TS6_Contr The amount the district contributes to the cost of the plan
+# TS6_FTE The number of retired teachers (age 65 or under) participating in the plan
+# TS6_ID number that is generated when a J-90 is submitted. Each record has an ID number
+
+# get each section, create uniform variable names, and stack them
+age66plus <- file5 %>%
+  setNames(str_replace(names(.), "ts5_", "")) %>%
+  mutate(source="file5", agecat="age66p")
+
+under66 <- file6 %>%
+  setNames(str_replace(names(.), "ts6_", "")) %>%
+  mutate(source="file6", agecat="under66")
+
+all.equal(names(age66plus), names(under66))
 
 
-glimpse(df1)
-df2 <- df1 %>%
-  rename(ccode=county, dcode=district) %>%
-  setNames(str_replace(names(.), "ts1_", "")) %>%
-  select(ccode, dcode, county, dname, type, ada, totfte, note,
-         maxcaf, maxsin, maxtwo, maxfam, captype,
-         ben_life, ben_stop, h_plan, d_plan, v_plan, o_plan) %>%
-  mutate(dname=str_to_title(dname))
-glimpse(df2)
-ht(df2)
+opeb1 <- bind_rows(age66plus, under66) %>%
+  mutate(agecat=factor(agecat, 
+                       levels=c("under66", "age66p")), # so they will sort as I want
+         column=factor(column, 
+                       levels=1:4, 
+                       labels=c("single", "twoparty", "family", "composite")),
+         ben=factor(ben,
+                    levels=c("h", "d", "v", "l", "o"),
+                    labels=c("health", "dental", "vision", "life", "other"))) %>%
+  rename(ccode=county, dcode=district, opebfte=fte, totcost=annual, ercost=contr,
+         plantype=ben, provider=desc, planseq=step, coverage=column) %>%
+  select(-cds, -id) %>%
+  arrange(agecat, year, ccode, dcode, plantype, planseq)
+glimpse(opeb1)
 
-# type 0=COE, 1=Elementary, 2=High School, 4=Unified, 3=Common Admin District
-ids <- df2 %>%
-  select(ccode:totfte, ben_life, ben_stop) %>%
-  mutate(year=2017,
-         typef=factor(type, levels=0:4,
-                      labels=c("COE", "Elementary", "High School", "Common Admin District", "Unified")))
+opeb <- ids %>%
+  left_join(opeb1, by = c("year", "ccode", "dcode"))
 
-count(ids, type, typef)
+saveRDS(opeb, paste0(ddir, "opeb.rds"))
 
+
+# checks ------------------------------------------------------------------
+ids <- readRDS(paste0(ddir, "ids.rds"))
+glimpse(ids)
+
+opeb <- readRDS(paste0(ddir, "opeb.rds"))
+glimpse(opeb)
+opeb 
+
+# total under66 and 66plus opeb costs by district by year
+costs <- opeb %>%
+  mutate(opebcost=naz(opebfte) * naz(totcost),
+         eropebcost=naz(opebfte) * naz(ercost)) %>%
+  group_by(year, ccode, dcode, county, dname, agecat) %>%
+  summarize(across(c(opebfte, opebcost, eropebcost), ~ sum(.x, na.rm=TRUE)),
+            ada=first(ada),
+            sfusd=first(sfusd), .groups="drop")
+summary(costs)
+
+df <- costs %>%
+  select(year, ccode, dcode, county, dname, agecat, ada, eropebcost) %>%
+  pivot_wider(names_from = agecat, values_from = eropebcost, values_fill = 0) %>%
+  select(-`NA`) %>%
+  mutate(totopeb=under66 + age66p,
+         costada=totopeb / ada,
+         age66pshare=age66p / totopeb)
+
+df %>% filter(year==2020) %>% arrange(-costada)
+df %>% filter(eval(sfusd))
+
+
+
+costs %>%
+  pivot_wider(names_from = agecat, values_from = c(opebfte, opebcost, eropebcost, values_fill=0))
+
+
+
+# OLD ----
 ids %>%
   count(type, typef, ben_life) %>%
   pivot_wider(names_from = ben_life, values_from = n, values_fill = 0) %>%
@@ -213,55 +321,6 @@ ids %>%
   pivot_wider(names_from = ben_life, values_from = n) %>%
   mutate(tot=N + Y,
          lifeshare=Y / tot)
-
-
-
-df2 %>%
-  filter(ccode==38, dcode==68478)
-
-
-df2 %>%
-  arrange(desc(maxfam))
-ns(df2)
-
-# County Two digit county code
-# District Five digit district code
-# CDS Seven digit combined code
-# TS6_BenA one character code indicating type of benefit.  H for heath, D for dental, V for vision, L for life, O for other
-# TS6_Desc The name of the plan
-# TS6_Step The health benefit plans ID.  The first is always 1, the second and subsequent like plans are number consequently. This is calculated by the input program
-# TS6_Column A column 1 is always Single, 2 is two party plan, 3 is family plan, 4 is composite rate
-# TS6_Annual The annual cost of plan
-# TS6_Contr The amount the district contributes to the cost of the plan
-# TS6_FTE The number of retired teachers (age 65 or under) participating in the plan
-# TS6_ID number that is generated when a J-90 is submitted. Each record has an ID number
-
-age65p1 <- sqlFetch(con, "tsal517") %>%
-  setNames(str_trim(str_to_lower(str_trim(names(.))))) %>%
-  as_tibble
-
-agelt651 <- sqlFetch(con, "tsal617") %>%
-  setNames(str_trim(str_to_lower(str_trim(names(.))))) %>%
-  as_tibble
-
-stack1 <- bind_rows(age65p1 %>% 
-                      setNames(str_remove(names(.), "ts5_")) %>%
-                      mutate(group="age65p"),
-                    agelt651 %>% 
-                      setNames(str_remove(names(.), "ts6_")) %>%
-                      mutate(group="ltage65")) %>%
-  select(-id, -cds) %>%
-  rename(ccode=county, dcode=district, anncost=annual, ercamount=contr) %>%
-  mutate(column=factor(column, 
-                       levels=1:4, 
-                       labels=c("single", "twoparty", "family", "composite")),
-         ben=factor(ben,
-                    levels=c("h", "d", "v", "l", "o"),
-                    labels=c("health", "dental", "vision", "life", "other")),
-         ercshare=ercamount / anncost) %>%
-  right_join(ids, by = c("ccode", "dcode")) %>%
-  select(all_of(names(ids)), everything())
-glimpse(stack1)
 
 
 cost1 <- stack1 %>%
