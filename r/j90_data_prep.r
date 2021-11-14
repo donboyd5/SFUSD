@@ -1,48 +1,26 @@
-# libraries ---------------------------------------------------------------
 
-library(tidyverse)
-options(tibble.print_max = 80, tibble.print_min = 80) # if more than 60 rows, print 60 - enough for states
-# library(arrow)
-# library(kableExtra)
-# library(btools)
-# library(gt)
-# library(knitr)
+# Notes -------------------------------------------------------------------
 
-# library(maps)
-# # https://cran.r-project.org/web/packages/usmap/vignettes/mapping.html
-# library(usmap)
-# library(gridExtra)
-# library(RcppRoll)
-# library(ggrepel)
-# library(ggbreak)
-# library(patchwork)
-# library(RColorBrewer)
+# trim and stack the CDE (California Department of Education) J-90 data for multiple years
+# Report of Teacher Salary and Benefit Data (Form J-90)
 
-# library(readxl)
-
-library(RODBC)
-
-# remotes::install_github("kiernann/mdbr")
-# library(mdbr)
-# ex <- mdb_example()
-# mdb_tables(ex)
-# mdb_tables(ex <- mdb_example())
+# There is a little bit of documentation on the CDE site for the data, and I have downloaded various documents
+# that give more. I have sent an email to CDE asking for the data collection form (J-90) and instructions
+# but have not heard back yet.
 
 
-# locations ---------------------------------------------------------------
+# j90 urls ----------------------------------------------------------------
+# https://www.cde.ca.gov/ds/fd/cs/   landing page
 
-dir <- r"(C:\Users\donbo\Downloads\SFUSD\1920SACS\Data/)"
-fn <- "sacs1920.mdb"
+# same file naming convention 2004-2020
+# https://www3.cde.ca.gov/ds-downloads/fd/cs/j901920.exe  2019-20 full package
+# https://www3.cde.ca.gov/ds-downloads/fd/cs/j900304.exe 2003-04 full package
 
+# earlier years
+# https://www3.cde.ca.gov/ds-downloads/fd/cs/j90_0203.exe
+# https://www3.cde.ca.gov/ds-downloads/fd/cs/j90_9900.exe
 
-
-# ms access notes ---------------------------------------------------------
-# https://www.roelpeters.be/solved-importing-microsoft-access-files-accdb-mdb-in-r/
-# If your tables aren’t huge (+4GB), you can simply change R to the 32-bit version.
-
-# https://newbedev.com/how-to-read-data-from-microsoft-access-accdb-database-files-into-r
-# You may need to run the 32-bit c:\windows\sysWOW64\odbcad32.exe if running 64-bit Windows
-
+# for now just work with 2004-2020
 
 
 # j90 information ---------------------------------------------------------
@@ -67,14 +45,11 @@ fn <- "sacs1920.mdb"
 # TS6_FTE The number of retired teachers (age 65 or under) participating in the plan
 # TS6_ID number that is generated when a J-90 is submitted. Each record has an ID number
 
-
-
 # TS1_Maxcaf The maximum annual employer contributions to cafeteria plan.
 # TS1_Maxsin The maximum annual employer contributions to single plan per employee.
 # TS1_Maxtwo The maximum annual employer contributions to a two party plan per employee.
 # TS1_Maxfam The maximum annual employer contributions to a family plan per employee.
 # TS1_CAPTYPE Is the cap hard or soft or NA
-
 
 # Ben_life	Does district cover retirees for life? (Y/N)
 # Ben_stop	If not for life, when do benefits stop? Age or years
@@ -85,24 +60,120 @@ fn <- "sacs1920.mdb"
 # O_plan	Number of other plans
 
 
+# County Two digit county code
+# District Five digit district code
+# CDS Seven digit combined code
+# TS6_BenA one character code indicating type of benefit.  H for heath, D for dental, V for vision, L for life, O for other
+# TS6_Desc The name of the plan
+# TS6_Step The health benefit plans ID.  The first is always 1, the second and subsequent like plans are number consequently. This is calculated by the input program
+# TS6_Column A column 1 is always Single, 2 is two party plan, 3 is family plan, 4 is composite rate
+# TS6_Annual The annual cost of plan
+# TS6_Contr The amount the district contributes to the cost of the plan
+# TS6_FTE The number of retired teachers (age 65 or under) participating in the plan
+# TS6_ID number that is generated when a J-90 is submitted. Each record has an ID number
 
-# Report of Teacher Salary and Benefit Data (Form J-90) -------------------
-j90dir <- r"(C:\Users\donbo\Downloads\SFUSD\j901617/)"
-j90fn <- "j901617.mdb"
+
+# libraries ---------------------------------------------------------------
+
+library(tidyverse)
+options(tibble.print_max = 80, tibble.print_min = 80) # if more than 60 rows, print 60 - enough for states
+# library(kableExtra)
+library(btools)
+# library(gt)
+# library(knitr)
+
+# library(gridExtra)
+# library(RcppRoll)
+# library(ggrepel)
+# library(ggbreak)
+# library(patchwork)
+# library(RColorBrewer)
+
+# library(readxl)
 
 
-con <- odbcConnectAccess(paste0(j90dir, j90fn))
-tables <- sqlTables(con)
-tables
-keeptables <- tables %>%
-  filter(TABLE_TYPE=="TABLE")
-keeptables
-keeptables$TABLE_NAME
+# local locations ---------------------------------------------------------------
 
-df1 <- sqlFetch(con, "tsal117") %>%
-  setNames(str_trim(str_to_lower(str_trim(names(.))))) %>%
-  as_tibble
-str_subset(names(df1), "county")
+j90dir <- r"(E:\data\CA_j90/)"
+
+
+# for each section, combine all years ----------------------
+
+get_yearsec <- function(year, section) {
+  print(year)
+  print(section)
+  indir <- paste0(j90dir, "data/", year, "/")
+  fname <- paste0("tsal", section, str_sub(year, 3, 4), ".rds")
+  fpath <- paste0(indir, fname)
+  df <- readRDS(fpath) %>%
+    mutate(year=!!year)
+  df
+}
+
+
+savesec <- function(years, section){
+  outdir <- paste0(j90dir, "data/allyears/")
+  outfname <- paste0("tsal_sec", section, ".rds")
+  outpath <- paste0(outdir, outfname)
+  print(outpath)
+  df <- purrr::map_dfr(years, get_yearsec, section)
+  saveRDS(df, file=outpath)
+}
+
+
+for(section in 1:6) savesec(2016:2020, section)
+
+
+# check to make sure files appear ok ----
+for(section in 1:6) {
+  ycount <- count(readRDS(paste0(j90dir, "data/allyears/", "tsal_sec", section, ".rds")), year)
+  print(section)
+  print(ycount)
+}
+count(readRDS(paste0(j90dir, "data/allyears/", "tsal_sec1.rds")), year)
+
+
+# make merged opeb-focused analytic file -----------------------------------------------
+#.. get all the data ----
+ddir <- paste0(j90dir, "data/allyears/")
+sec1 <- readRDS(paste0(ddir, "tsal_sec1.rds"))
+sec2 <- readRDS(paste0(ddir, "tsal_sec2.rds"))
+sec3 <- readRDS(paste0(ddir, "tsal_sec3.rds"))
+sec4 <- readRDS(paste0(ddir, "tsal_sec4.rds"))
+sec5 <- readRDS(paste0(ddir, "tsal_sec5.rds"))
+sec6 <- readRDS(paste0(ddir, "tsal_sec6.rds"))
+
+#.. create an id file that we can merge against others ----
+glimpse(sec1)
+# County	C 2	J-90	Two digit county code
+# District	C 5	J-90	Five digit district Code
+# CDS	C 7	J-90	Seven digit combined code - Note this is the code used as a key for all records in system
+# TS1_Dname	C 34	Master	District Name (Long name)
+# TS1_County	C 18	Master	County Name
+# TS1_Type	C 1	Master	0=COE, 1=Elementary, 2=High School, 4=Unified, 3=Common Admin District
+# TS1_ADA	N 7	Master	The current P-2 ADA
+ids <- sec1 %>%
+  select(year, ccode=county, dcode=district, dname=ts1_dname, county=ts1_county,
+         type=ts1_type, ada=ts1_ada) %>%
+  mutate(typef=factor(type, levels=0:4,
+                      labels=c("COE", "Elementary", "High School", "Common Admin District", "Unified"))) %>%
+  select(-ada, everything(), ada)
+glimpse(ids)
+count(ids, year, type, typef) %>%
+  arrange(type, typef, year)
+saveRDS(ids, paste0(ddir, "ids.rds"))
+
+#.. get the health information from sec1 ----
+# TS1_Note	C 80	J-90	The name of the agency or trust through which the district purchases the health plans
+# TS1_Conf	C 1	Entered	After the district returns the confirmation for to SSC, this field contains a “Y”
+# TS1_Maxcaf	N 8.2	J-90	The maximum annual employer contributions to cafeteria plan
+# TS1_Maxsin	N 8.2	J-90	The maximum annual employer contributions to single plan per employee.
+# TS1_Maxtwo	N 8.2	J-90	The maximum annual employer contributions to a two party plan per employee.
+# TS1_Maxthree	N 8.2	J-90	The maximum annual employer contributions to a three party plan per employee
+# TS1_Maxfam	N 8.2	J-90	The maximum annual employer contributions to a family plan per employee.
+# TS1_CAPTYPE	C 2	J-90	Is the cap hard or soft or NA
+
+
 
 glimpse(df1)
 df2 <- df1 %>%
@@ -239,100 +310,4 @@ cost3 %>%
 sfusd <- df6b %>%
   filter(ccode==38, dcode==68478)
 
-# how can we have more ftes enrolled in a plan than ftes in the district?  
 
-
-for(tab in gettabs){
-  print(tab)
-  df <- sqlFetch(con, tab) %>%
-    setNames(str_trim(str_to_lower(names(.))))
-  assign(str_to_lower(tab), df)
-}
-odbcClose(con)
-
-
-
-
-# get data ----------------------------------------------------------------
-# https://www.cde.ca.gov/ds/fd/cs/
-tables <- c("Object")
-
-con <- odbcConnectAccess(paste0(dir, fn))
-tables <- sqlTables(con)
-tables
-keeptables <- tables %>%
-  filter(TABLE_TYPE=="TABLE")
-keeptables
-keeptables$TABLE_NAME
-
-keeptables$TABLE_NAME[1]
-gettabs <- setdiff(keeptables$TABLE_NAME, c("Goal"))
-
-for(tab in gettabs){
-  print(tab)
-  df <- sqlFetch(con, tab) %>%
-    setNames(str_trim(str_to_lower(names(.))))
-  assign(str_to_lower(tab), df)
-}
-odbcClose(con)
-
-
-# examine data ------------------------------------------------------------
-glimpse(leas)
-leas %>%
-#   filter(str_detect(dname, coll("San Fran", ignore_case = TRUE)))
-# ccode dcode                                                                       dname           dtype   k12ada
-# 1    38 10389 San Francisco County Office of Education                                    CO OFFICE           0.00
-# 2    38 68478 San Francisco Unified                                                       UNIFIED         50096.27
-# 3    41 69070 South San Francisco Unified                                                 UNIFIED          7975.79
-
-glimpse(object)
-object %>%
-  filter(str_detect(title, "OPEB")) %>%
-  mutate(title=str_trim(title))
-# code                                          title
-# 1 3701        OPEB, Allocated, certificated positions
-# 2 3702          OPEB, Allocated, classified positions
-# 3 3751 OPEB, Active Employees, certificated positions
-# 4 3752   OPEB, Active Employees, classified positions
-# 5 9664                       Total/Net OPEB Liability
-object <- object %>%
-  mutate(title=str_trim(title))
-
-opeb_codes <- object %>%
-  filter(str_detect(title, "OPEB")) %>%
-  .$code
-opeb_codes
-
-glimpse(usergl)
-usergl <- usergl %>%
-  rename(func=`function`) # function apparently is a reserved word
-
-glcodes <- count(usergl, object)  # only 30 for 9664
-usergl %>%
-  filter(object=="9664") %>%
-  arrange(desc(value))
-# 168,255,392.1 for 30 66522 
-leas %>%
-  filter(ccode==30, dcode==66522)
-  
-usergl %>%
-  filter(ccode==38, dcode==68478) %>%
-  filter(object %in% opeb_codes) %>%
-  arrange(desc(value))
-
-usergl %>%
-  filter(ccode==38, dcode==68478) %>%
-  filter(object == "9664")
-
-usergl %>%
-  filter(ccode==38, dcode==68478) %>%
-  filter(object == "3751") %>%
-  arrange(desc(value))
-
-count(usergl_totals %>% filter(object %in% opeb_codes), object)
-
-
-tmp <- usergl_totals %>%
-  filter(ccode==38) %>%
-  arrange(object)
