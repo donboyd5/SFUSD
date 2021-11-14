@@ -1,0 +1,115 @@
+---
+title: "OPEB analysis"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_notebook: 
+    df_print: paged
+    fig_height: 6
+    fig_width: 8
+    toc: yes
+    number_sections: yes
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, eval=TRUE, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+
+# note that eval=TRUE unless set to FALSE
+
+knitr::opts_chunk$set(eval=TRUE, include=FALSE, echo=FALSE)
+options(width = 150)
+```
+
+```{r libraries}
+library(tidyverse)
+options(tibble.print_max = 80, tibble.print_min = 80) # if more than nn rows, print 60 - enough for states
+library(readxl)
+
+library(btools)
+
+# tables
+library(knitr)
+library(kableExtra)
+library(DT)
+library(gt)
+
+library(maps)
+# https://cran.r-project.org/web/packages/usmap/vignettes/mapping.html
+library(usmap)
+library(gridExtra)
+library(RcppRoll)
+library(ggrepel)
+library(ggbreak)
+library(patchwork)
+library(RColorBrewer)
+
+```
+
+# Marc Joffe's OPEB data
+
+```{r joffe}
+mjfn <- "OPEB Study Data 2021-02-18.xlsx"
+
+mj1 <- read_excel(here::here("data", mjfn), sheet="OPEB Study Data")
+# glimpse(mj1)
+# summary(mj1)
+
+mj2 <- mj1 %>%
+  select(-...10) %>%
+  rename(stabbr=state,
+         penrev=`pension/revenue`,
+         opebrev=`opeb/revenue`)
+# summary(mj2)
+# count(mj2, stabbr)
+
+mjsd <- mj2 %>%
+  filter(str_detect(name, coll("school", ignore_case = TRUE)))
+
+
+```
+
+
+<!-- ## Large California school districts in 2019: pensions and OPEB as % of revenue -->
+
+```{r mj_largecasd, include=FALSE}
+mjsd %>%
+  filter(stabbr=="CA", total_revenues >= 100e6) %>%
+  arrange(desc(opebrev)) %>%
+  select(-c(year, opeb_liabilities_elsewhere)) %>%
+  datatable(caption="California school districts in 2019 with total revenues >= $100m\n, Source: Marc Joffe",
+            options=list(warn.size=FALSE,
+                         pageLength = 25)) %>%
+  formatCurrency(
+    columns=c("pension_debt", "opeb_debt", "total_revenues"),
+    currency = "",
+    digits=0,
+    interval = 3, 
+    mark = ",") %>%
+  formatPercentage(
+    columns = c("penrev", "opebrev"),
+    digits=1)
+```
+
+## Large California, Nevada, and Oregon school districts in 2019: pensions and OPEB as % of revenue
+```{r mj_largesd, include=TRUE}
+mjsd %>%
+  filter(stabbr %in% c("CA", "NV", "OR"), total_revenues >= 100e6) %>%
+  arrange(desc(opebrev)) %>%
+  select(-c(year, opeb_liabilities_elsewhere)) %>%
+  datatable(caption="California, Nevada, and Oregon school districts in 2019 with total revenues >= $100m. Source: Marc Joffe",
+            options=list(warn.size=FALSE,
+                         pageLength = 20)) %>%
+  formatCurrency(
+    columns=c("pension_debt", "opeb_debt", "total_revenues"),
+    currency = "",
+    digits=0,
+    interval = 3, 
+    mark = ",") %>%
+  formatPercentage(
+    columns = c("penrev", "opebrev"),
+    digits=1)
+
+```
+
+
+# J-90 OPEB data

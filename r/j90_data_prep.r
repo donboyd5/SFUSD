@@ -254,10 +254,17 @@ opeb1 <- bind_rows(age66plus, under66) %>%
          ben=factor(ben,
                     levels=c("h", "d", "v", "l", "o"),
                     labels=c("health", "dental", "vision", "life", "other"))) %>%
-  rename(ccode=county, dcode=district, opebfte=fte, totcost=annual, ercost=contr,
+  rename(ccode=county, dcode=district, opebfte=fte, plancost=annual, planercost=contr,
          plantype=ben, provider=desc, planseq=step, coverage=column) %>%
-  select(-cds, -id) %>%
-  arrange(agecat, year, ccode, dcode, plantype, planseq)
+  mutate(planeecost=plancost - planercost,
+         totcost=opebfte * plancost,
+         totercost=opebfte * planercost,
+         toteecost=opebfte * planeecost) %>%
+  select(year, ccode, dcode, agecat, plantype, provider, planseq, coverage, opebfte, 
+         plancost, planercost, planeecost,
+         totcost, totercost, toteecost,
+         source) %>%
+  arrange(agecat, year, ccode, dcode, plantype, planseq, coverage)
 glimpse(opeb1)
 
 opeb <- ids %>%
@@ -273,6 +280,31 @@ glimpse(ids)
 opeb <- readRDS(paste0(ddir, "opeb.rds"))
 glimpse(opeb)
 opeb 
+count(opeb, provider) %>% arrange(desc(n))
+
+tmp <- opeb %>% filter(sfusd)
+
+tmp %>%
+  filter(plantype=="health") %>%
+  filter(year==2020) %>%
+  mutate(erpct=totercost / sum(totercost),
+         lbl=ifelse(erpct > .05, paste0(round(erpct, 2), "-", coverage), "")) %>%
+  ggplot(aes(x=planeecost, y=opebfte, size=erpct, label=lbl)) +
+  geom_point() +
+  geom_text(nudge_x = 500, size=3)
+
+tmp2 <- tmp %>%
+  filter(plantype=="health") %>%
+  filter(year==2020) %>%
+  mutate(erpct=totercost / sum(totercost)) %>%
+  arrange(-erpct)
+
+tmp2 %>%
+  select(dname, plantype, agecat, provider, coverage, opebfte, 
+         plancost, eeplancost, erplancost, totcost, totercost, toteecost, erpct) %>%
+  mutate(cumerpct=cumsum(erpct))
+  
+
 
 # total under66 and 66plus opeb costs by district by year
 costs <- opeb %>%
@@ -285,14 +317,23 @@ costs <- opeb %>%
 summary(costs)
 
 df <- costs %>%
-  select(year, ccode, dcode, county, dname, agecat, ada, eropebcost) %>%
-  pivot_wider(names_from = agecat, values_from = eropebcost, values_fill = 0) %>%
-  select(-`NA`) %>%
-  mutate(totopeb=under66 + age66p,
+  select(year, ccode, dcode, county, dname, agecat, ada, opebfte, eropebcost) %>%
+  pivot_wider(names_from = agecat, values_from = c(opebfte, eropebcost), values_fill = 0) %>%
+  select(-contains("NA")) %>%
+  mutate(opebfte=opebfte_under66 + opebfte_age66p,
+         totopeb=eropebcost_under66 + eropebcost_age66p,
          costada=totopeb / ada,
-         age66pshare=age66p / totopeb)
+         age66pshare=eropebcost_age66p / totopeb,
+         costfte=totopeb / opebfte,
+         fteada=opebfte / ada
+         )
 
-df %>% filter(year==2020) %>% arrange(-costada)
+df2 <- df %>%
+  select(-contains("_"))
+
+df2 %>% filter(year==2020) %>% arrange(-costada)
+df2 %>% filter(eval(sfusd))
+
 df %>% filter(eval(sfusd))
 
 
