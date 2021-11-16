@@ -45,6 +45,20 @@ library(RColorBrewer)
 
 ```
 
+```{r constants}
+dsacs <- r"(E:\data\CA_sacs/)"
+dsacs_all <- paste0(dsacs, "data/allyears/")
+
+dj90 <- r"(E:\data\CA_j90/)"
+dj90_all <- paste0(dj90, "data/allyears/")
+
+```
+
+```{r logical_expressions}
+sfusd <- expression(ccode==38 & dcode==68478)
+```
+
+
 # Marc Joffe's OPEB data
 
 ```{r joffe}
@@ -112,4 +126,69 @@ mjsd %>%
 ```
 
 
+# SACS financial data
+```{r load_sacs}
+system.time(all_sacs <- readRDS(paste0(dsacs_all, "all_sacs.rds")))
+sacs_summary <- readRDS(file=paste0(dsacs_all, "sacs_summary.rds"))
+
+df <- sacs_summary %>%
+  rename(tchropeb=o3701, otheropeb=o3702, totopeb=gfopebx)
+```
+
+
+## SFUSD OPEB nominal amounts
+```{r include=TRUE}
+df %>%
+  filter(eval(sfusd)) %>%
+  select(year, contains("opeb")) %>%
+  pivot_longer(cols = -year) %>%
+  ggplot(aes(year, value / 1e6, colour=name)) +
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(name = "$ millions", breaks=seq(0, 100, 5), limits=c(0, NA)) +
+  ggtitle("San Francisco GF OPEB benefit expenditures")
+  
+  
+```
+
+# SFUSD OPEB as % of total spending
+```{r include=TRUE}
+df %>%
+  filter(eval(sfusd)) %>%
+  mutate(opebpct=totopeb / (current + totopeb)) %>%
+  ggplot(aes(year, opebpct)) +
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(name = "% of spending", labels = scales::percent) +
+  ggtitle("San Francisco GF OPEB benefit expenditures as % of total spending")
+```
+
+
+# Top OPEB-as-% of spending large districts
+```{r include=TRUE}
+
+
+```
+
+
 # J-90 OPEB data
+```{r}
+opeb_j90 <- readRDS(paste0(dj90_all, "opeb.rds"))
+
+```
+
+```{r}
+opeb_j90 %>%
+  filter(eval(sfusd)) %>%
+  filter(plantype=="health") %>%
+  filter(year==2020) %>%
+  mutate(erpct=totercost / sum(totercost),
+         lbl=ifelse(erpct > .05, round(erpct, 2), "")) %>%
+  ggplot(aes(x=planeecost, y=opebfte, size=erpct, colour=coverage, label=lbl)) +
+  geom_point() +
+  geom_text(nudge_x = 750, size=3) +
+  scale_y_continuous("# of participants", labels = scales::comma) +
+  scale_x_continuous("annual cost to the participant", labels=scales::comma) +
+  ggtitle("SFUSD retired OPEB participants and per-retiree plan costs in 2020")
+```
+

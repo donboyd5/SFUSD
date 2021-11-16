@@ -141,13 +141,13 @@ count(readRDS(paste0(j90dir, "data/allyears/", "tsal_file1.rds")), year)
 
 # make merged opeb-focused analytic file -----------------------------------------------
 #.. get all the data ----
-ddir <- paste0(j90dir, "data/allyears/")
-file1 <- readRDS(paste0(ddir, "tsal_file1.rds"))  # 1 rec per district per year
-file2 <- readRDS(paste0(ddir, "tsal_file2.rds"))
-file3 <- readRDS(paste0(ddir, "tsal_file3.rds"))
-file4 <- readRDS(paste0(ddir, "tsal_file4.rds"))
-file5 <- readRDS(paste0(ddir, "tsal_file5.rds"))
-file6 <- readRDS(paste0(ddir, "tsal_file6.rds"))
+ddirj90 <- paste0(j90dir, "data/allyears/")
+file1 <- readRDS(paste0(ddirj90, "tsal_file1.rds"))  # 1 rec per district per year
+file2 <- readRDS(paste0(ddirj90, "tsal_file2.rds"))
+file3 <- readRDS(paste0(ddirj90, "tsal_file3.rds"))
+file4 <- readRDS(paste0(ddirj90, "tsal_file4.rds"))
+file5 <- readRDS(paste0(ddirj90, "tsal_file5.rds"))
+file6 <- readRDS(paste0(ddirj90, "tsal_file6.rds"))
 
 #   setNames(str_replace(names(.), "ts1_", "")) # drop prefixes?
 
@@ -179,7 +179,7 @@ count(ids, year, dtype, dtypef) %>%
   arrange(dtype, dtypef, year)
 ids %>% filter(sfusd)
 
-saveRDS(ids, paste0(ddir, "ids.rds"))
+saveRDS(ids, paste0(ddirj90, "ids.rds"))
 
 
 #.. get the health information from file1 MAY NOT USE THIS ----
@@ -245,7 +245,7 @@ under66 <- file6 %>%
 all.equal(names(age66plus), names(under66))
 
 
-opeb1 <- bind_rows(age66plus, under66) %>%
+opeb_j901 <- bind_rows(age66plus, under66) %>%
   mutate(agecat=factor(agecat, 
                        levels=c("under66", "age66p")), # so they will sort as I want
          column=factor(column, 
@@ -267,22 +267,22 @@ opeb1 <- bind_rows(age66plus, under66) %>%
   arrange(agecat, year, ccode, dcode, plantype, planseq, coverage)
 glimpse(opeb1)
 
-opeb <- ids %>%
-  left_join(opeb1, by = c("year", "ccode", "dcode"))
+opeb_j90 <- ids %>%
+  left_join(opeb_j901, by = c("year", "ccode", "dcode"))
 
-saveRDS(opeb, paste0(ddir, "opeb.rds"))
+saveRDS(opeb_j90, paste0(ddirj90, "opeb.rds"))
 
 
 # checks ------------------------------------------------------------------
-ids <- readRDS(paste0(ddir, "ids.rds"))
+ids <- readRDS(paste0(ddirj90, "ids.rds"))
 glimpse(ids)
 
-opeb <- readRDS(paste0(ddir, "opeb.rds"))
-glimpse(opeb)
-opeb 
-count(opeb, provider) %>% arrange(desc(n))
+opeb_j90 <- readRDS(paste0(ddirj90, "opeb.rds"))
+glimpse(opeb_j90)
+opeb_j90 
+count(opeb_j90, provider) %>% arrange(desc(n))
 
-tmp <- opeb %>% filter(sfusd)
+tmp <- opeb_j90 %>% filter(sfusd)
 
 tmp %>%
   filter(plantype=="health") %>%
@@ -303,111 +303,25 @@ tmp2 %>%
   select(dname, plantype, agecat, provider, coverage, opebfte, 
          plancost, eeplancost, erplancost, totcost, totercost, toteecost, erpct) %>%
   mutate(cumerpct=cumsum(erpct))
-  
 
 
 # total under66 and 66plus opeb costs by district by year
-costs <- opeb %>%
-  mutate(opebcost=naz(opebfte) * naz(totcost),
-         eropebcost=naz(opebfte) * naz(ercost)) %>%
+costs <- opeb_j90 %>%
   group_by(year, ccode, dcode, county, dname, agecat) %>%
-  summarize(across(c(opebfte, opebcost, eropebcost), ~ sum(.x, na.rm=TRUE)),
+  summarize(across(c(plancost, totercost), ~ sum(.x, na.rm=TRUE)),
             ada=first(ada),
             sfusd=first(sfusd), .groups="drop")
 summary(costs)
 
 df <- costs %>%
-  select(year, ccode, dcode, county, dname, agecat, ada, opebfte, eropebcost) %>%
-  pivot_wider(names_from = agecat, values_from = c(opebfte, eropebcost), values_fill = 0) %>%
+  select(year, ccode, dcode, county, dname, agecat, ada, totercost) %>%
+  pivot_wider(names_from = agecat, values_from = c(totercost), values_fill = 0) %>%
   select(-contains("NA")) %>%
-  mutate(opebfte=opebfte_under66 + opebfte_age66p,
-         totopeb=eropebcost_under66 + eropebcost_age66p,
+  mutate(totopeb=under66 + age66p,
          costada=totopeb / ada,
-         age66pshare=eropebcost_age66p / totopeb,
-         costfte=totopeb / opebfte,
-         fteada=opebfte / ada
-         )
+         age66pshare=age66p / totopeb)
 
-df2 <- df %>%
-  select(-contains("_"))
-
-df2 %>% filter(year==2020) %>% arrange(-costada)
-df2 %>% filter(eval(sfusd))
-
+df %>% filter(year==2020) %>% arrange(-costada)
 df %>% filter(eval(sfusd))
-
-
-
-costs %>%
-  pivot_wider(names_from = agecat, values_from = c(opebfte, opebcost, eropebcost, values_fill=0))
-
-
-
-# OLD ----
-ids %>%
-  count(type, typef, ben_life) %>%
-  pivot_wider(names_from = ben_life, values_from = n, values_fill = 0) %>%
-  mutate(tot=N + Y,
-         lifeshare=Y / tot)
-
-ids %>%
-  filter(ben_life=="Y") %>%
-  select(ccode, dcode, county, dname, typef, ada, totfte, ben_life, ben_stop) %>%
-  arrange(desc(ada))
-
-ids %>%
-  mutate(adacut=cut(ada, c(-Inf, 0, 5e3, 10e3, 25e3, 50e3, 100e3, Inf))) %>%
-  group_by(adacut, ben_life) %>%
-  summarise(n=n()) %>%
-  pivot_wider(names_from = ben_life, values_from = n) %>%
-  mutate(tot=N + Y,
-         lifeshare=Y / tot)
-
-
-cost1 <- stack1 %>%
-  group_by(year, ccode, dcode, county, dname, type, typef, group, ben) %>%
-  mutate(totcost=anncost * fte,
-         erc=ercamount * fte) %>%
-  summarise(ada=first(ada),
-            totfte=first(totfte),
-            ben_life=first(ben_life),
-            ben_stop=first(ben_stop),
-            totcost=sum(totcost, na.rm=TRUE),
-            erc=sum(erc, na.rm=TRUE), 
-            .groups="drop") %>%
-  mutate(ercshare=erc / totcost)
-
-cost2 <- cost1 %>%
-  group_by(year, ccode, dcode, county, dname, type, typef, group) %>%
-  summarise(ada=first(ada),
-            totcost=sum(totcost, na.rm=TRUE), 
-            erc=sum(erc, na.rm=TRUE), .groups="drop") %>%
-  mutate(ercshare=erc / totcost)
-
-# get age65p as share of total cost, get cost per ada  
-cost3 <- cost2 %>%
-  select(-ercshare, -totcost, -type, -year) %>%
-  filter(!is.na(group)) %>%
-  pivot_wider(names_from = group,
-              values_from = erc,
-              values_fill = 0) %>%
-  mutate(ercost=ltage65 + age65p,
-         share65p=age65p / ercost,
-         costada=ercost / ada)
-
-cost3 %>%
-  arrange(desc(ercost))
-
-cost3 %>%
-  arrange(desc(share65p))
-
-cost3 %>%
-  filter(ada > 0) %>%
-  filter(ada >= 5e3) %>%
-  arrange(desc(costada))
-
-
-sfusd <- df6b %>%
-  filter(ccode==38, dcode==68478)
 
 
