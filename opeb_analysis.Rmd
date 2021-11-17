@@ -24,6 +24,7 @@ options(width = 150)
 library(tidyverse)
 options(tibble.print_max = 80, tibble.print_min = 80) # if more than nn rows, print 60 - enough for states
 library(readxl)
+library(lubridate)
 
 library(btools)
 
@@ -43,9 +44,14 @@ library(ggbreak)
 library(patchwork)
 library(RColorBrewer)
 
+library(fredr)
+
 ```
 
 ```{r constants}
+fred_apikey <- "a5e1199baac333154cbffcba3b263c28"
+fredr_set_key(fred_apikey)
+
 dsacs <- r"(E:\data\CA_sacs/)"
 dsacs_all <- paste0(dsacs, "data/allyears/")
 
@@ -136,6 +142,7 @@ mjsd %>%
 ```{r load_sacs}
 system.time(all_sacs <- readRDS(paste0(dsacs_all, "all_sacs.rds")))
 sacs_gfcurrent <- readRDS(file=paste0(dsacs_all, "sacs_gfcurrent.rds"))
+leas <- readRDS(file=paste0(dsacs_all, "leas.rds"))  # local education agencies -- for k12ada
 
 
 ```
@@ -170,8 +177,52 @@ p
 
 ggsave(plot=p, filename=here::here("results", "benefit_shares.png"), width=10, height=6.5, units="in")
 write_csv(pdata, here::here("results", "benefit_shares_data.csv"))
-    
 
+```
+
+
+## SFUSD real per-pupil current educational spending on benefits and other items
+```{r rpp}
+# Gross domestic product (chain-type price index)
+# FRED https://fred.stlouisfed.org/series/A191RG3A086NBEA
+price <- fredr("A191RG3A086NBEA", frequency = "a")
+gdppi <- price %>%
+  rename(gdppi=value) %>%
+  mutate(year=year(date),
+         igdppi=gdppi[year==2020] / gdppi) %>%
+  select(year, gdppi, igdppi)
+
+
+df <- sacs_gfcurrent %>%
+  filter(eval(sfusd)) %>%
+  left_join(leas %>% 
+              filter(eval(sfusd)) %>%
+              select(year, ccode, dcode, k12ada), 
+            by = c("ccode", "dcode", "year")) %>%
+  left_join(gdppi %>% select(year, igdppi), by="year") %>%
+  mutate(currentadj=current + gfopeb, # opeb is not in current expenses
+         retben=gfopeb + ercpen,
+         salaries=certsals + classsals) %>%  
+  pivot_longer(-c(year, ccode, dcode, dname, k12ada, igdppi)) %>%
+  mutate(xpp=value / k12ada,  # expenditures per pupil
+         rxpp=xpp * igdppi)
+
+```
+
+
+```{r rpp_plot, include=TRUE}
+names(sacs_gfcurrent)
+df %>%
+  filter(name %in% c("service", "retben", "salaries", "health")) %>%
+  ggplot(aes(year, rxpp, colour=name)) +
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(name="2020 $ per pupil", breaks=seq(0, 10e3, 2e3), labels=comma, limits=c(0, NA)) +
+  scale_x_continuous(name=NULL) +
+  ggtitle("Expenditures per pupil, 2020 dollars",
+          subtitle = "Salaries, services, retirement benefits (pension + OPEB), and employee health") +
+  theme_bw() +
+  legend_notitle
 
 ```
 
