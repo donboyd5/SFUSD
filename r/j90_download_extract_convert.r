@@ -118,9 +118,6 @@ library(RODBC)
 j90dir <- r"(E:\data\CA_j90/)"
 
 
-
-
-
 # ONETIME: j90 download ------------------------------------------------------------
 urlbase <- "https://www3.cde.ca.gov/ds-downloads/fd/cs/"
 # j901920.exe
