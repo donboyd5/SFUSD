@@ -4,6 +4,7 @@
 
 library(tidyverse)
 options(tibble.print_max = 80, tibble.print_min = 80) # if more than 60 rows, print 60 - enough for states
+library(scales)
 library(knitr)
 library(kableExtra)
 library(btools)
@@ -105,8 +106,6 @@ deduct_food_funcs <- 3700
 deduct_fringeret_objects <- c(3701, 3702)
 deduct_facilities_funcs <- 8500
 
-objects_included <- setdiff(gross_objects, deduct_fringeret_objects)
-
 
 # sacs_summary ----
 # summary(all_sacs)
@@ -133,11 +132,37 @@ icost <- 7300:7399
 # Food Services -- function 3700
 # Fringe Benefits for retired persons object -- 3701-3702
 # Facilities Acquisition and Construction  function 8500
-deduct_nonagency_goals <- c(7100:7199) %>% as.character
-deduct_commservice_goals <- 8100 %>% as.character
+deduct_nonagency_goals <- c(7100:7199) 
+deduct_commservice_goals <- 8100
 deduct_food_funcs <- 3700
 deduct_fringeret_objects <- c(3701, 3702)
 deduct_facilities_funcs <- 8500
+
+# add some additional variables to summarize
+
+# 3101–3102
+# State Teachers’ Retirement System. Record expenditures to provide personnel
+# with retirement benefits under the State Teachers’ Retirement System (STRS).
+# This excludes employee contributions. Object 3101 is certificated personnel in
+# STRS; Object 3102 includes those individuals who hold classified positions but
+# are enrolled in STRS.
+
+# 3201–3202
+# Public Employees’ Retirement System. Record expenditures to provide personnel
+# with retirement benefits under the Public Employees’ Retirement System (PERS).
+# This excludes employee contributions, although it does include the employer’s
+# payment of an employee’s contribution. Object 3201 indicates those employees
+# in certificated positions and enrolled in PERS; Object 3202 indicates
+# employees in classified positions and enrolled in PERS.
+
+# 3401–3402
+# Health and Welfare Benefits. Record expenditures made to provide personnel
+# with health and welfare insurance benefits. This excludes employee
+# contributions but includes health and welfare benefit premiums paid to a
+# self-insurance fund. Object 3401 indicates that the benefits cover
+# certificated positions; Object 3402 indicates that the benefits cover
+# classified positions.
+
 
 sacs_gfcurrent <- all_sacs %>%
   filter(fund=="0001") %>%  # general fund
@@ -158,19 +183,28 @@ sacs_gfcurrent <- all_sacs %>%
          
          # avoid double-deductions
          deduct=dnonagency | dcommservice | dfood | dfringeret | dfacilities,
+         
          # other variables we want
          o3701=object=="3701",
-         o3702=object=="3702") %>%
+         o3702=object=="3702",
+         
+         erctrs=object %in% c(3101, 3102),
+         ercpers=object %in% c(3201, 3202),
+         health=object %in% c(3401, 3402)
+         
+         ) %>%
   group_by(year, ccode, dcode, dname) %>%
   summarise(across(
     c(gross, deduct,
       certsals, classsals, empben, books, equip, service, icost,
       dnonagency, dcommservice, dfood, dfringeret, dfacilities,
-      o3701, o3702),
+      
+      o3701, o3702, erctrs, ercpers, health),
     ~ sum(.x * value, na.rm=TRUE)),
     .groups="drop") %>%
   mutate(current=gross - deduct,
-         gfopeb=o3701 + o3702)
+         gfopeb=o3701 + o3702,
+         ercpen=erctrs + ercpers)
 
 saveRDS(sacs_gfcurrent, file=paste0(dsacs_all, "sacs_gfcurrent.rds"))
 
@@ -201,15 +235,17 @@ sacs_gfcurrent %>%
   geom_line()
 
 
-all_sacs %>%
-  filter(eval(sfusd), object %in% c(3701, 3702)) %>%
-  group_by(year, ccode, dcode, dname, object) %>%
-  summarise(value=sum(value, na.rm=TRUE), .groups="drop") %>%
-  mutate(group=ifelse(object==3701, "teacher", "other")) %>%
-  ggplot(aes(year, value / value[year==2010], colour=group)) +
-  geom_line() +
-  geom_point() +
-  geom_hline(yintercept = 1)
+# all_sacs %>%
+#   filter(eval(sfusd), object %in% c(3701, 3702)) %>%
+#   group_by(year, ccode, dcode, dname, object) %>%
+#   summarise(value=sum(value, na.rm=TRUE), .groups="drop") %>%
+#   mutate(group=ifelse(object==3701, "teacher", "other")) %>%
+#   ggplot(aes(year, value / value[year==2010], colour=group)) +
+#   geom_line() +
+#   geom_point() +
+#   geom_hline(yintercept = 1)
+
+
 
 
 # OLD - data for comparisons to reported current expense ----

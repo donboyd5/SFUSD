@@ -52,6 +52,12 @@ dsacs_all <- paste0(dsacs, "data/allyears/")
 dj90 <- r"(E:\data\CA_j90/)"
 dj90_all <- paste0(dj90, "data/allyears/")
 
+#.. graph theme items
+legend_none <- theme(legend.position = "None")
+legend_notitle <- theme(legend.title = element_blank())
+caption_left <- theme(plot.caption = element_text(hjust = 0))
+
+
 ```
 
 ```{r logical_expressions}
@@ -129,15 +135,50 @@ mjsd %>%
 # SACS financial data
 ```{r load_sacs}
 system.time(all_sacs <- readRDS(paste0(dsacs_all, "all_sacs.rds")))
-sacs_summary <- readRDS(file=paste0(dsacs_all, "sacs_summary.rds"))
+sacs_gfcurrent <- readRDS(file=paste0(dsacs_all, "sacs_gfcurrent.rds"))
 
-df <- sacs_summary %>%
-  rename(tchropeb=o3701, otheropeb=o3702, totopeb=gfopebx)
+
 ```
 
 
+## SFUSD Health, pension, and OPEB benefits as % of general fund
+```{r shares, include=TRUE, fig.width=10, fig.height=6.5}
+pdata <- sacs_gfcurrent %>%
+  filter(eval(sfusd)) %>%
+  select(year, current, gfopeb, ercpen, health) %>%
+  mutate(currentadj=current + gfopeb) %>%  # opeb is not in current expenses
+  pivot_longer(-c(year, current, currentadj)) %>%
+  mutate(share=value / currentadj,
+         name=factor(name,
+                     levels=c("health", "ercpen", "gfopeb"),
+                     labels=c("employee health", "pensions", "opeb"))) %>%
+  arrange(name)
+
+p <- pdata %>%
+  ggplot(aes(year, share, color=name)) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(name=NULL) +
+  scale_y_continuous(name="% share", labels=percent, breaks=seq(0, 1, .025), limits = c(0, NA)) +
+  labs(caption="Source: California Department of Education SACS financial data.") + 
+  ggtitle("SFUSD health, pension, and OPEB cash expenditures as % of current education expense",
+          subtitle="General fund only. Current expenses adjusted to include OPEB payments.") +
+  theme_bw() +
+  theme(plot.caption = element_text(hjust = 0, face="italic")) +
+  legend_notitle
+p
+
+ggsave(plot=p, filename=here::here("results", "benefit_shares.png"), width=10, height=6.5, units="in")
+write_csv(pdata, here::here("results", "benefit_shares_data.csv"))
+    
+
+
+```
+
+
+
 ## SFUSD OPEB nominal amounts
-```{r include=TRUE}
+```{r include=FALSE}
 df %>%
   filter(eval(sfusd)) %>%
   select(year, contains("opeb")) %>%
