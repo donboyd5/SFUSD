@@ -163,7 +163,9 @@ write_csv(pdata, here::here("results", "benefit_shares_data.csv"))
 
 ## SFUSD real per-pupil current educational spending on benefits and other items
 
-```{r rpp}
+```{r gdppi}
+# isolate this so we don't keep rerunning it
+
 # Gross domestic product (chain-type price index)
 # FRED https://fred.stlouisfed.org/series/A191RG3A086NBEA
 price <- fredr("A191RG3A086NBEA", frequency = "a")
@@ -173,7 +175,11 @@ gdppi <- price %>%
          igdppi=gdppi[year==2020] / gdppi) %>%
   select(year, gdppi, igdppi)
 
+```
 
+
+```{r rxpp}
+names(sacs_gfcurrent)
 xpp <- sacs_gfcurrent %>%
   filter(eval(sfusd)) %>%
   left_join(leas %>% 
@@ -181,7 +187,7 @@ xpp <- sacs_gfcurrent %>%
               select(year, ccode, dcode, k12ada), 
             by = c("ccode", "dcode", "year")) %>%
   left_join(gdppi %>% select(year, igdppi), by="year") %>%
-  mutate(retben=gfopeb + ercpenadj,
+  mutate(retben=gfopebretired + ercpenadj,
          salaries=certsals + classsals) %>%  
   pivot_longer(-c(year, ccode, dcode, dname, k12ada, igdppi)) %>%
   mutate(xpp=value / k12ada,  # expenditures per pupil
@@ -193,7 +199,7 @@ xpp <- sacs_gfcurrent %>%
 ### Plot over time
 ```{r rpp_plot, include=TRUE}
 # names(sacs_gfcurrent)
-capt <- "Note: retirement benefits include OPEB cash payments, and exclude state contributions to CalSTRS on behalf of districts"
+capt <- "Note: retirement benefits include OPEB payments for retirees, and exclude state contributions to CalSTRS on behalf of districts"
 
 p <- xpp %>%
   filter(name %in% c("service", "retben", "salaries", "health")) %>%
@@ -249,17 +255,25 @@ tabdata %>%
 ```
 
 
-## Top OPEB spending districts (general fund)
+## General fund OPEB spending
 
-```{r}
+```{r opebdf}
 opebdf <- sacs_gfcurrent %>%
-  select(year, ccode, dcode, dname, currentadj, gfopeb) %>%
+  select(year, ccode, dcode, dname, currentadj, gfopeb, gfopebretired, gfopebactives,
+         o3701, o3702, o3751, o3752) %>%
   left_join(leas %>% select(year, ccode, dcode, k12ada), 
             by = c("year", "ccode", "dcode")) %>%
+  # NOTE: using TOTAL opeb below, not just retired or actives
   mutate(share=gfopeb / currentadj,
          opebpp=gfopeb / k12ada,
+         teacher=o3701 + o3751,
+         classified=o3702 + o3752,
+         teacherpp=teacher / k12ada,
+         classifiedpp=classified / k12ada,
+         retiredpp=gfopebretired / k12ada,
+         activespp=gfopebactives / k12ada,
          sfusd=eval(sfusd))
-
+# ns(sacs_gfcurrent)
 ```
 
 
@@ -269,8 +283,10 @@ A few quick exploratory graphs
 # find oddities
 opebdf %>%
   filter(year==2020) %>%
-  select(ccode, dcode, dname, k12ada, gfopeb, opebpp, share) %>%
-  arrange(desc(share))
+  select(ccode, dcode, dname, k12ada, gfopebretired, gfopebactives, gfopeb, opebpp, share) %>%
+  arrange(desc(gfopeb))
+
+
 # drop ccode 19	dcode 40139	Pupil Transportation Co-Op JPA, which is 100%
 
 # a lot of the oddities have k12ada <= 100
@@ -278,6 +294,11 @@ opebdf %>%
   filter(year==2020, k12ada > 0) %>%
   select(ccode, dcode, dname, k12ada, gfopeb, opebpp, share) %>%
   arrange(desc(opebpp))
+
+opebdf %>%
+  filter(year==2020, k12ada >= 1000) %>%
+  select(ccode, dcode, dname, k12ada, gfopeb, opebpp, share) %>%
+  arrange(gfopeb)
 
 opebdf %>%
   filter(year==2020, k12ada >= 100) %>%
@@ -290,52 +311,244 @@ opebdf %>%
   arrange(desc(k12ada))
 
 
-drops <- expression(ccode==19 & dcode==40139)
-
+drops <- expression((ccode==19 & dcode==40139))
+opeb2 <- opebdf %>%
+  filter(!eval(drops), k12ada >= 1000, gfopeb >= 0)
 
 ```
 
 
 ```{r opeb_share, include=TRUE}
 
-opebdf %>%
-  filter(year==2020, !eval(drops), share > .005, k12ada >= 1000) %>%
+opeb2 %>%
+  filter(year==2020) %>%
   ggplot(aes(k12ada, share, colour=sfusd)) +
   geom_point() +
   scale_x_log10(labels=comma) +
   scale_y_continuous(labels=percent) +
   # scale_y_log10(labels=percent) +
-  ggtitle("OPEB as % of adjusted current expenditures, General Fund, 2020",
+  ggtitle("OPEB (retired + actives) as % of adjusted current expenditures, General Fund, 2020",
           subtitle="By district size (attendance), log10 scale") +
-  labs(caption="Districts with at least 1,000 students. Several outliers excluded.") +
+  labs(caption="Districts with at least 1,000 students and nonnegative opeb. Several outliers excluded.") +
   caption_left
    
 
-
 ```
 
 
-```{r}
-
-```
-
-```{r opeb_ada}
+```{r opeb_ada, include=TRUE}
 # relative to attendance
-opebdf %>%
-  filter(year==2020, !eval(drops), k12ada > 0, opebpp > 0) %>%
+opeb2 %>%
+  filter(year==2020) %>%
   ggplot(aes(k12ada, opebpp, colour=sfusd)) +
   geom_point() +
   scale_x_log10(labels=comma) +
   # scale_y_log10() + # labels=comma
-  scale_y_continuous(limits=c(0, 1600)) +
-  ggtitle("OPEB expenditures per pupil, General Fund, 2020",
-          subtitle="By district size (attendance) on log10 scale") +
-  labs(caption="Several outliers excluded") +
+  scale_y_continuous(limits=c(0, NA)) +
+  ggtitle("OPEB expenditures (retired + actives) per pupil, General Fund, 2020",
+          subtitle="By district size (attendance), log10 scale") +
+  labs(caption="Districts with at least 1,000 students and nonnegative opeb. Several outliers excluded.") +
   caption_left
 
 
 
 ```
+## General fund OPEB spending by largest districts (by attendance)
+
+### Actives and retired
+```{r largest_districts, include=TRUE}
+year <- 2020
+
+tabdata <- opeb2 %>%
+  filter(year==!!year) %>%
+  arrange(desc(k12ada)) %>%
+  filter(row_number() <= 10) %>%
+  mutate(across(starts_with("gf"), ~.x / 1e6)) %>%
+  select(ccode, dcode, dname, k12ada, gfopebretired, gfopebactives, gfopeb, opebpp)
+
+tabdata %>%
+  gt() %>%
+  tab_header(
+      title = paste0("General fund opeb-related expenditures, ", year, ", largest districts by enrollment"),
+      subtitle = "GF expenditures in $ millions, per pupil in $"
+    ) %>%
+    fmt_number(
+      columns = k12ada,
+      decimals = 0,
+      suffixing = FALSE
+    ) %>%
+    fmt_number(
+      columns = starts_with("gf"),
+      decimals = 2,
+      suffixing = FALSE
+    ) %>%
+    fmt_number(
+      columns = opebpp,
+      decimals = 0,
+      suffixing = FALSE
+    )
+  
+
+```
+
+
+
+### Teachers and classified
+```{r largest_districts_etype, include=TRUE}
+year <- 2020
+
+tabdata <- opeb2 %>%
+  filter(year==!!year) %>%
+  arrange(desc(k12ada)) %>%
+  filter(row_number() <= 10) %>%
+  mutate(across(starts_with("gf"), ~.x / 1e6)) %>%
+  select(ccode, dcode, dname, k12ada, gfopeb, teacherpp, classifiedpp, opebpp)
+
+tabdata %>%
+  gt() %>%
+  tab_header(
+      title = paste0("General fund opeb-related expenditures, ", year, ", largest districts by enrollment"),
+      subtitle = "GF expenditures in $ millions, per pupil in $"
+    ) %>%
+    fmt_number(
+      columns = k12ada,
+      decimals = 0,
+      suffixing = FALSE
+    ) %>%
+    fmt_number(
+      columns = starts_with("gf"),
+      decimals = 2,
+      suffixing = FALSE
+    ) %>%
+    fmt_number(
+      columns = c(teacherpp, classifiedpp, opebpp),
+      decimals = 0,
+      suffixing = FALSE
+    )
+  
+
+```
+
+
+### Large districts' general fund OPEB spending over time
+
+```{r fig.height=8, fig.width=8, include=TRUE}
+# get large districts
+n <- 25
+
+large <- opeb2 %>%
+  filter(year==2020) %>%
+  arrange(desc(k12ada)) %>%
+  filter(row_number() <= n) %>%
+  arrange(desc(opebpp)) %>%
+  mutate(sort=row_number()) %>%
+  select(year, ccode, dcode, dname, k12ada, opebpp, sort)
+
+# get plot data
+pdata <- large %>%
+  select(ccode, dcode, dname) %>%  # use the 2020 name as they can change over time
+  left_join(opeb2 %>%
+              select(year, ccode, dcode, activespp, retiredpp, opebpp),
+            by = c("ccode", "dcode")) %>%
+  pivot_longer(cols=(ends_with("pp"))) %>%
+  mutate(dname2=factor(dname, levels=large$dname, labels=large$dname))
+
+p <- pdata %>%
+  filter(name=="opebpp") %>%
+  arrange(dname2) %>%
+  ggplot(aes(year, value)) +
+  geom_line(colour="blue") +
+  geom_point(colour="blue") +
+  theme_bw() +
+  facet_wrap(~dname2, ncol=5) +
+  ggtitle(label="General Fund OPEB expenditures per pupil over time. CAUTION: Nominal.",
+          subtitle="25 largest California school districts, by attendance. Districts ordered by 2020 per-pupil OPEB spending.") +
+  scale_y_continuous(name="$ per pupil", labels=comma) +
+  scale_x_continuous(name=NULL) +
+  labs(caption="NOTE: Includes payments for retirees plus any trust contributions for actives") +
+  caption_left
+  
+p  
+
+
+```
+
+
+
+```{r doc_opeb}
+
+# documentation on selected sacs codes ------------------------------------
+#.. 3101–3102 State Teachers’ Retirement System ----
+# State Teachers’ Retirement System. Record expenditures to provide personnel
+# with retirement benefits under the State Teachers’ Retirement System (STRS).
+# This excludes employee contributions. Object 3101 is certificated personnel in
+# STRS; Object 3102 includes those individuals who hold classified positions but
+# are enrolled in STRS.
+
+#.. 3201–3202 Public Employees’ Retirement System ----
+# Public Employees’ Retirement System. Record expenditures to provide personnel
+# with retirement benefits under the Public Employees’ Retirement System (PERS).
+# This excludes employee contributions, although it does include the employer’s
+# payment of an employee’s contribution. Object 3201 indicates those employees
+# in certificated positions and enrolled in PERS; Object 3202 indicates
+# employees in classified positions and enrolled in PERS.
+
+#.. 3401–3402 Health and Welfare Benefits ----
+# Health and Welfare Benefits. Record expenditures made to provide personnel
+# with health and welfare insurance benefits. This excludes employee
+# contributions but includes health and welfare benefit premiums paid to a
+# self-insurance fund. Object 3401 indicates that the benefits cover
+# certificated positions; Object 3402 indicates that the benefits cover
+# classified positions.
+
+
+#.. 3701 OPEB, Allocated, certificated positions ----
+# Expenditures (1) for retirees and other former employees for current-year
+# postemployment benefits other than pensions (OPEB) financed on a pay-as-you-go
+# basis; or (2) for the amounts paid to an OPEB plan (administered through a
+# qualifying trust) in excess of the current-year actuarially determined service
+# cost. A qualifying trust is a trust or an equivalent arrangement that meets
+# the criteria in paragraph 4 of GASB Statement 75. Do not include expenditures
+# for service costs for active employees; these must be direct-charged using
+# objects 3751–3752. Expenditures in objects 3701–3702 must be allocated to all
+# activities in proportion to total salaries or total full-time equivalents
+# (FTEs) in those activities. Object 3701 relates to certificated positions;
+# Object 3702 relates to classified positions.
+
+#.. 3702 OPEB, Allocated, classified positions ----
+# same text
+
+#.. 3751 OPEB, Active Employees, certificated positions ----
+# Expenditures for the amounts paid to a OPEB plan (administered through a
+# qualifying trust) up to the current-year actuarially determined service costs
+# for OPEB-eligible active employees. A qualifying trust is a trust or an
+# equivalent arrangement that meets the criteria in paragraph 4 of GASB
+# Statement 75. Do not include expenditures for retirees and other former
+# employees; these must be allocated using objects 3701–3702. Expenditures in
+# objects 3751–3752 must be direct-charged on a per-eligible-FTE basis to the
+# same resource, goal, and function as the OPEB-eligible active employee’s
+# salary. Object 3751 relates to certificated positions; Object 3752 relates to
+# classified positions.
+
+#.. 3752 OPEB, Active Employees, classified positions----
+# same text
+
+#.. 9664 Total/Net OPEB Liability ----
+# The total OPEB liability is the portion of the actuarial present value of
+# projected benefit payments that is attributed to past periods of employee
+# service, measured in conformity with the requirements of GASB Statement 75.
+# For a defined benefit OPEB plan that is not administered through a trust that
+# meets the criteria in paragraph 4 of GASB 75 (specified criteria), the total
+# OPEB liability is reported. For a defined benefit OPEB plan that is
+# administered through a trust that meets the specified criteria, a net OPEB
+# liability (that is, the total OPEB liability minus the OPEB plan’s fiduciary
+# net position) is reported. The total or net OPEB liability is reported only in
+# the LEA’s accrual-basis financial statements.
+
+# I don't bother to include 9664 because almost no districts report it.
+
+```
+
 
 
 # J-90 OPEB data
