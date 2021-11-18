@@ -1,6 +1,6 @@
 
 
-# CAUTION -----------------------------------------------------------------
+# CAUTION re MS Access -----------------------------------------------------------------
 # Reading Microsoft Access files is tricky.
 
 # you will need the package RODBC
@@ -17,6 +17,17 @@
 # Third, oddly, the newer .accdb Access fles must be read using
 #   odbcConnectAccess2007(fpath)
 # where fpath is the full path (including file name) to the .accdb file.
+
+# ms access notes ---------------------------------------------------------
+# https://www.roelpeters.be/solved-importing-microsoft-access-files-accdb-mdb-in-r/
+# If your tables aren’t huge (+4GB), you can simply change R to the 32-bit version.
+
+# https://newbedev.com/how-to-read-data-from-microsoft-access-accdb-database-files-into-r
+# You may need to run the 32-bit c:\windows\sysWOW64\odbcad32.exe if running 64-bit Windows
+
+# I (djb) examined alternative approaches but in the end concluded that the best thing to do
+# is run this file with 32-bit R to extract and convert the files from MS Access, and do all
+# subsequent analysis with 64-bit R.
 
 
 # Notes -------------------------------------------------------------------
@@ -44,6 +55,9 @@
 
 
 # j90 information ---------------------------------------------------------
+
+# last 2 digits of each file name give the ending year of the local fiscal year
+# for example - TSAL117 is file 1 for the 2016-17 local fiscal year
 
 # TSAL117 File Contains information from sections I, III, IV, V, and VI of the J-90
 # TSAL217 File Contains the text headings entered for each of the columns in the salary schedule, Section II
@@ -91,19 +105,6 @@
 # TS6_Contr The amount the district contributes to the cost of the plan
 # TS6_FTE The number of retired teachers (age 65 or under) participating in the plan
 # TS6_ID number that is generated when a J-90 is submitted. Each record has an ID number
-
-
-
-# ms access notes ---------------------------------------------------------
-# https://www.roelpeters.be/solved-importing-microsoft-access-files-accdb-mdb-in-r/
-# If your tables aren’t huge (+4GB), you can simply change R to the 32-bit version.
-
-# https://newbedev.com/how-to-read-data-from-microsoft-access-accdb-database-files-into-r
-# You may need to run the 32-bit c:\windows\sysWOW64\odbcad32.exe if running 64-bit Windows
-
-# I (djb) examined alternative approaches but in the end concluded that the best thing to do
-# is run this file with 32-bit R to extract and convert the files from MS Access, and do all
-# subsequent analysis with 64-bit R.
 
 
 # libraries ---------------------------------------------------------------

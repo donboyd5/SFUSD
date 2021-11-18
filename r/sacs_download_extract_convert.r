@@ -1,6 +1,6 @@
 
 
-# CAUTION -----------------------------------------------------------------
+# CAUTION re MS Access -----------------------------------------------------------------
 # Reading Microsoft Access files is tricky.
 
 # you will need the package RODBC
@@ -17,6 +17,18 @@
 # Third, oddly, the newer .accdb Access fles must be read using
 #   odbcConnectAccess2007(fpath)
 # where fpath is the full path (including file name) to the .accdb file.
+
+# ms access notes ---------------------------------------------------------
+# https://www.roelpeters.be/solved-importing-microsoft-access-files-accdb-mdb-in-r/
+# If your tables aren’t huge (+4GB), you can simply change R to the 32-bit version.
+
+# https://newbedev.com/how-to-read-data-from-microsoft-access-accdb-database-files-into-r
+# You may need to run the 32-bit c:\windows\sysWOW64\odbcad32.exe if running 64-bit Windows
+
+# I (djb) examined alternative approaches but in the end concluded that the best thing to do
+# is run this file with 32-bit R to extract and convert the files from MS Access, and do all
+# subsequent analysis with 64-bit R.
+
 
 
 # Notes -------------------------------------------------------------------
@@ -128,18 +140,6 @@
 # liability (that is, the total OPEB liability minus the OPEB plan’s fiduciary
 # net position) is reported. The total or net OPEB liability is reported only in
 # the LEA’s accrual-basis financial statements.
-
-
-# ms access notes ---------------------------------------------------------
-# https://www.roelpeters.be/solved-importing-microsoft-access-files-accdb-mdb-in-r/
-# If your tables aren’t huge (+4GB), you can simply change R to the 32-bit version.
-
-# https://newbedev.com/how-to-read-data-from-microsoft-access-accdb-database-files-into-r
-# You may need to run the 32-bit c:\windows\sysWOW64\odbcad32.exe if running 64-bit Windows
-
-# I (djb) examined alternative approaches but in the end concluded that the best thing to do
-# is run this file with 32-bit R to extract and convert the files from MS Access, and do all
-# subsequent analysis with 64-bit R.
 
 
 # libraries ---------------------------------------------------------------

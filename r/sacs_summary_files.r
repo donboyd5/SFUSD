@@ -1,5 +1,75 @@
 
 
+# documentation on selected sacs codes ------------------------------------
+#.. 3101–3102 State Teachers’ Retirement System ----
+# State Teachers’ Retirement System. Record expenditures to provide personnel
+# with retirement benefits under the State Teachers’ Retirement System (STRS).
+# This excludes employee contributions. Object 3101 is certificated personnel in
+# STRS; Object 3102 includes those individuals who hold classified positions but
+# are enrolled in STRS.
+
+#.. 3201–3202 Public Employees’ Retirement System ----
+# Public Employees’ Retirement System. Record expenditures to provide personnel
+# with retirement benefits under the Public Employees’ Retirement System (PERS).
+# This excludes employee contributions, although it does include the employer’s
+# payment of an employee’s contribution. Object 3201 indicates those employees
+# in certificated positions and enrolled in PERS; Object 3202 indicates
+# employees in classified positions and enrolled in PERS.
+
+#.. 3401–3402 Health and Welfare Benefits ----
+# Health and Welfare Benefits. Record expenditures made to provide personnel
+# with health and welfare insurance benefits. This excludes employee
+# contributions but includes health and welfare benefit premiums paid to a
+# self-insurance fund. Object 3401 indicates that the benefits cover
+# certificated positions; Object 3402 indicates that the benefits cover
+# classified positions.
+
+
+#.. 3701 OPEB, Allocated, certificated positions ----
+# Expenditures (1) for retirees and other former employees for current-year
+# postemployment benefits other than pensions (OPEB) financed on a pay-as-you-go
+# basis; or (2) for the amounts paid to an OPEB plan (administered through a
+# qualifying trust) in excess of the current-year actuarially determined service
+# cost. A qualifying trust is a trust or an equivalent arrangement that meets
+# the criteria in paragraph 4 of GASB Statement 75. Do not include expenditures
+# for service costs for active employees; these must be direct-charged using
+# objects 3751–3752. Expenditures in objects 3701–3702 must be allocated to all
+# activities in proportion to total salaries or total full-time equivalents
+# (FTEs) in those activities. Object 3701 relates to certificated positions;
+# Object 3702 relates to classified positions.
+
+#.. 3702 OPEB, Allocated, classified positions ----
+# same text
+
+#.. 3751 OPEB, Active Employees, certificated positions ----
+# Expenditures for the amounts paid to a OPEB plan (administered through a
+# qualifying trust) up to the current-year actuarially determined service costs
+# for OPEB-eligible active employees. A qualifying trust is a trust or an
+# equivalent arrangement that meets the criteria in paragraph 4 of GASB
+# Statement 75. Do not include expenditures for retirees and other former
+# employees; these must be allocated using objects 3701–3702. Expenditures in
+# objects 3751–3752 must be direct-charged on a per-eligible-FTE basis to the
+# same resource, goal, and function as the OPEB-eligible active employee’s
+# salary. Object 3751 relates to certificated positions; Object 3752 relates to
+# classified positions.
+
+#.. 3752 OPEB, Active Employees, classified positions----
+# same text
+
+#.. 9664 Total/Net OPEB Liability ----
+# The total OPEB liability is the portion of the actuarial present value of
+# projected benefit payments that is attributed to past periods of employee
+# service, measured in conformity with the requirements of GASB Statement 75.
+# For a defined benefit OPEB plan that is not administered through a trust that
+# meets the criteria in paragraph 4 of GASB 75 (specified criteria), the total
+# OPEB liability is reported. For a defined benefit OPEB plan that is
+# administered through a trust that meets the specified criteria, a net OPEB
+# liability (that is, the total OPEB liability minus the OPEB plan’s fiduciary
+# net position) is reported. The total or net OPEB liability is reported only in
+# the LEA’s accrual-basis financial statements.
+
+# I don't bother to include 9664 because almost no districts report it.
+
 # libraries ---------------------------------------------------------------
 
 library(tidyverse)
@@ -9,7 +79,6 @@ library(knitr)
 library(kableExtra)
 library(btools)
 # library(gt)
-
 
 # library(gridExtra)
 # library(RcppRoll)
@@ -34,7 +103,12 @@ sfusd <- expression(ccode==38 & dcode==68478)
 
 # create a district-by year general fund file with major categories of spending, plus OPEB ----
 
-# include current expense, based
+# sacs_summary ----
+# summary(all_sacs)
+
+#.. define codes needed for summaries ----
+
+# include current expense, based on
 # https://www.cde.ca.gov/ds/fd/ec/currentexpense.asp
 # plus Nov 15, 2021 email to my dboyd@albany.edu account from
 # Kevin Turner for SACSINFO
@@ -43,6 +117,14 @@ sfusd <- expression(ccode==38 & dcode==68478)
 # 1430 N Street, Suite 3800
 # Sacramento, CA 95814
 # 916-322-1770
+
+# Current expense of education. The current general fund operating expenditures
+# of an LEA for kindergarten and grades one through twelve, excluding
+# expenditures for food services, community services, nonagency activities,
+# fringe benefits for retired persons, acquisition and construction of
+# facilities, and objects 6000 and 7000.
+
+# see csam procedure 330
 
 # items included in gross expenditures
 # 1000 Certificated Salaries
@@ -57,60 +139,6 @@ sfusd <- expression(ccode==38 & dcode==68478)
 # Services; (3) Food Services; (4) Fringe Benefits for Retired Persons; and (5)
 # Facilities Acquisition and Construction.
 
-# Current expense of education. The current general fund operating expenditures
-# of an LEA for kindergarten and grades one through twelve, excluding
-# expenditures for food services, community services, nonagency activities,
-# fringe benefits for retired persons, acquisition and construction of
-# facilities, and objects 6000 and 7000.
-
-# Screenshot of Form CEA from Kevin Turner suggests deductions are:
-# Nonagency -- goals 7100-7199
-# Community Services -- goal 8100
-# Food Services -- function 3700
-# Fringe Benefits for retired persons object -- 3701-3702
-# Facilities Acquisition and Construction  function 8500
-
-
-all_sacs <- readRDS(paste0(dsacs_all, "all_sacs.rds"))
-summary(all_sacs)
-
-
-# object codes of items included in gross expenditures
-certsals <- 1000:1999
-classsals <- 2000:2999
-empben <- 3000:3999
-books <- 4000:4999
-equip <- 6500:6599  # this is what the website says
-# equip <- 6400:6599  # this includes equip purchase
-service <- 5000:5999
-icost <- 7300:7399
-# see csam procedure 330
-# 1000 Certificated Salaries
-# 2000 Classified Salaries
-# 3000 Employee Benefits
-# 4000 Books and Supplies
-# 6500 Equipment Replacement
-# 5000 & 7300 Services and Indirect Costs
-gross_objects <- c(certsals, classsals, empben, service, icost)
-
-
-# now define deductions
-# Nonagency -- goals 7100-7199
-# Community Services -- goal 8100
-# Food Services -- function 3700
-# Fringe Benefits for retired persons object -- 3701-3702
-# Facilities Acquisition and Construction  function 8500
-deduct_nonagency_goals <- c(7100:7199) %>% as.character
-deduct_commservice_goals <- 8100 %>% as.character
-deduct_food_funcs <- 3700
-deduct_fringeret_objects <- c(3701, 3702)
-deduct_facilities_funcs <- 8500
-
-
-# sacs_summary ----
-# summary(all_sacs)
-
-# object codes of items included in gross expenditures
 certsals <- 1000:1999
 classsals <- 2000:2999
 empben <- 3000:3999
@@ -118,15 +146,8 @@ books <- 4000:4999
 equip <- 6500:6599
 service <- 5000:5999
 icost <- 7300:7399
-# see csam procedure 330
-# 1000 Certificated Salaries
-# 2000 Classified Salaries
-# 3000 Employee Benefits
-# 4000 Books and Supplies
-# 6500 Equipment Replacement
-# 5000 & 7300 Services and Indirect Costs
 
-# now define deductions
+# Screenshot of Form CEA from Kevin Turner suggests deductions are:
 # Nonagency -- goals 7100-7199
 # Community Services -- goal 8100
 # Food Services -- function 3700
@@ -138,32 +159,23 @@ deduct_food_funcs <- 3700
 deduct_fringeret_objects <- c(3701, 3702)
 deduct_facilities_funcs <- 8500
 
-# add some additional variables to summarize
 
-# 3101–3102
-# State Teachers’ Retirement System. Record expenditures to provide personnel
-# with retirement benefits under the State Teachers’ Retirement System (STRS).
-# This excludes employee contributions. Object 3101 is certificated personnel in
-# STRS; Object 3102 includes those individuals who hold classified positions but
-# are enrolled in STRS.
+#.. Dealing with state payments to TRS on behalf of districts ----
 
-# 3201–3202
-# Public Employees’ Retirement System. Record expenditures to provide personnel
-# with retirement benefits under the Public Employees’ Retirement System (PERS).
-# This excludes employee contributions, although it does include the employer’s
-# payment of an employee’s contribution. Object 3201 indicates those employees
-# in certificated positions and enrolled in PERS; Object 3202 indicates
-# employees in classified positions and enrolled in PERS.
+# Some of what I (djb) write here is a hypothesis that still needs to be verified, but I am highly confident it is correct.
 
-# 3401–3402
-# Health and Welfare Benefits. Record expenditures made to provide personnel
-# with health and welfare insurance benefits. This excludes employee
-# contributions but includes health and welfare benefit premiums paid to a
-# self-insurance fund. Object 3401 indicates that the benefits cover
-# certificated positions; Object 3402 indicates that the benefits cover
-# classified positions.
+# In 2014, the California legislature adopted AB1469, intended to put CalSTRS on stronger financial footing. As part of that, state required payments to CalSTRS were defined, and district required payments to CalSTRS were defined (previously they had been vague), and in addition the state began to make payments on behalf of school districts.
+
+# These state payments on behalf of school districts were included in the CDE SACS data as if they were payments by the school districts. Thus, in addition to the fact that district payments to CalSTRS made with their own funds increased due to AB1469, REPORTED district payments also increased because of the state payments on behalf of districts that are recorded as district spending. BOTH kinds of payments are included in codes 3101 and 3102 (pension contributions to CalSTRS for certificated and classified employees respectively).
+
+# To make apples-to-apples comparisons over time, we should subtract these "on behalf" payments from the reported payments, AFTER we calculate current educational expense. (As defined by CDE, current educational expense includes these payments so we want to keep them in the offical definition, but for our own analtic purposes we will want to subtract them.) These payments can be identified by the combination of object 8590 and resource 7690 (CSAM Jan 2019 p.310-15). We therefore include these on-behalf payments in the summary file so that they can be subtracted from current education expense.
 
 
+#.. Create the summary file ----
+all_sacs <- readRDS(paste0(dsacs_all, "all_sacs.rds"))
+summary(all_sacs)
+
+# this may take 10-20 secs
 sacs_gfcurrent <- all_sacs %>%
   filter(fund=="0001") %>%  # general fund
   mutate(certsals=object %in% certsals,
@@ -187,8 +199,11 @@ sacs_gfcurrent <- all_sacs %>%
          # other variables we want
          o3701=object=="3701",
          o3702=object=="3702",
+         o3751=object=="3751",
+         o3752=object=="3752",
          
          erctrs=object %in% c(3101, 3102),
+         onbehalf=object=="8590" & resource=="7690", # state payments to CalSTRS on behalf of districts
          ercpers=object %in% c(3201, 3202),
          health=object %in% c(3401, 3402)
          
@@ -199,14 +214,25 @@ sacs_gfcurrent <- all_sacs %>%
       certsals, classsals, empben, books, equip, service, icost,
       dnonagency, dcommservice, dfood, dfringeret, dfacilities,
       
-      o3701, o3702, erctrs, ercpers, health),
+      o3701, o3702, o3751, o3752,
+      erctrs, onbehalf, ercpers, health),
     ~ sum(.x * value, na.rm=TRUE)),
     .groups="drop") %>%
-  mutate(current=gross - deduct,
-         gfopeb=o3701 + o3702,
-         ercpen=erctrs + ercpers)
+  mutate(gfopebretired=o3701 + o3702,
+         gfopebactives=o3751 + o3752,
+         gfopeb=gfopebretired + gfopebactives,
+         ercpen=erctrs + ercpers,
+         erctrsadj=erctrs - onbehalf,
+         ercpenadj=erctrsadj + ercpers,
+         
+         current=gross - deduct,
+         currentadj=current + gfopebretired - onbehalf
+         )
 
 saveRDS(sacs_gfcurrent, file=paste0(dsacs_all, "sacs_gfcurrent.rds"))
+
+
+summary(sacs_gfcurrent)
 
 
 # Check the general fund summary file -------------------------------------

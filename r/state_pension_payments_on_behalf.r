@@ -21,7 +21,7 @@ sf %>%
 
 
 all_sacs %>%
-  # filter(fund=="0001") %>%
+  filter(fund=="0001") %>%
   filter((object %in% c(3101, 3102)) | (resource=="7690" & object=="8590")) %>%
   mutate(erctrs=object %in% c(3101, 3102),
          behalf=(resource=="7690" & object=="8590")) %>%
@@ -38,8 +38,8 @@ all_sacs %>%
   geom_point() +
   scale_y_continuous(name="Expenditures ($ millions)", breaks=seq(0, 10e3, 2e3), limits=c(0, NA), labels = comma) +
   scale_x_continuous(name=NULL) +
-  ggtitle("California school district general fund payments to CalSTRS".
-          subtitle="Including and excluding payments by the state on behalf of districts") %>%
+  ggtitle("California school district general fund payments to CalSTRS",
+          subtitle="Including and excluding payments by the state on behalf of districts") +
   theme_bw() +
   legend_notitle 
 

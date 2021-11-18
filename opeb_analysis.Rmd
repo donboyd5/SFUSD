@@ -15,8 +15,9 @@ editor_options:
 ```{r setup, eval=TRUE, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 
 # note that eval=TRUE unless set to FALSE
+# to have a chunk's output show in the html file, set include=TRUE in the chunk's options
 
-knitr::opts_chunk$set(eval=TRUE, include=FALSE, echo=FALSE)
+knitr::opts_chunk$set(eval=TRUE, include=FALSE, echo=FALSE, rows.print=20)
 options(width = 150)
 ```
 
@@ -24,6 +25,7 @@ options(width = 150)
 library(tidyverse)
 options(tibble.print_max = 80, tibble.print_min = 80) # if more than nn rows, print 60 - enough for states
 library(readxl)
+library(scales)
 library(lubridate)
 
 library(btools)
@@ -58,7 +60,7 @@ dsacs_all <- paste0(dsacs, "data/allyears/")
 dj90 <- r"(E:\data\CA_j90/)"
 dj90_all <- paste0(dj90, "data/allyears/")
 
-#.. graph theme items
+#.. graph theme items ----
 legend_none <- theme(legend.position = "None")
 legend_notitle <- theme(legend.title = element_blank())
 caption_left <- theme(plot.caption = element_text(hjust = 0))
@@ -69,7 +71,6 @@ caption_left <- theme(plot.caption = element_text(hjust = 0))
 ```{r logical_expressions}
 sfusd <- expression(ccode==38 & dcode==68478)
 ```
-
 
 # Marc Joffe's OPEB data
 
@@ -94,29 +95,10 @@ mjsd <- mj2 %>%
 
 ```
 
-
-<!-- ## Large California school districts in 2019: pensions and OPEB as % of revenue -->
-
-```{r mj_largecasd, include=FALSE}
-mjsd %>%
-  filter(stabbr=="CA", total_revenues >= 100e6) %>%
-  arrange(desc(opebrev)) %>%
-  select(-c(year, opeb_liabilities_elsewhere)) %>%
-  datatable(caption="California school districts in 2019 with total revenues >= $100m\n, Source: Marc Joffe",
-            options=list(warn.size=FALSE,
-                         pageLength = 25)) %>%
-  formatCurrency(
-    columns=c("pension_debt", "opeb_debt", "total_revenues"),
-    currency = "",
-    digits=0,
-    interval = 3, 
-    mark = ",") %>%
-  formatPercentage(
-    columns = c("penrev", "opebrev"),
-    digits=1)
-```
-
 ## Large California, Nevada, and Oregon school districts in 2019: pensions and OPEB as % of revenue
+
+SFUSD has 7th highest OPEB liability as % of total revenue, among large school districts in California, Nevada, and Oregon (defined as those that have at least \$100 million in revenue).
+
 ```{r mj_largesd, include=TRUE}
 mjsd %>%
   filter(stabbr %in% c("CA", "NV", "OR"), total_revenues >= 100e6) %>%
@@ -137,28 +119,27 @@ mjsd %>%
 
 ```
 
-
 # SACS financial data
+
 ```{r load_sacs}
-system.time(all_sacs <- readRDS(paste0(dsacs_all, "all_sacs.rds")))
+system.time(all_sacs <- readRDS(paste0(dsacs_all, "all_sacs.rds")))  # 30 secs
 sacs_gfcurrent <- readRDS(file=paste0(dsacs_all, "sacs_gfcurrent.rds"))
 leas <- readRDS(file=paste0(dsacs_all, "leas.rds"))  # local education agencies -- for k12ada
 
 
 ```
 
-
 ## SFUSD Health, pension, and OPEB benefits as % of general fund
+
 ```{r shares, include=TRUE, fig.width=10, fig.height=6.5}
 pdata <- sacs_gfcurrent %>%
   filter(eval(sfusd)) %>%
-  select(year, current, gfopeb, ercpen, health) %>%
-  mutate(currentadj=current + gfopeb) %>%  # opeb is not in current expenses
-  pivot_longer(-c(year, current, currentadj)) %>%
+  select(year, currentadj, gfopebretired, gfopebactives, ercpenadj, health) %>%
+  pivot_longer(-c(year, currentadj)) %>%
   mutate(share=value / currentadj,
          name=factor(name,
-                     levels=c("health", "ercpen", "gfopeb"),
-                     labels=c("employee health", "pensions", "opeb"))) %>%
+                     levels=c("health", "ercpenadj", "gfopebactives", "gfopebretired"),
+                     labels=c("employee health", "pensions", "opeb-actives", "opeb-retirees"))) %>%
   arrange(name)
 
 p <- pdata %>%
@@ -168,8 +149,8 @@ p <- pdata %>%
   scale_x_continuous(name=NULL) +
   scale_y_continuous(name="% share", labels=percent, breaks=seq(0, 1, .025), limits = c(0, NA)) +
   labs(caption="Source: California Department of Education SACS financial data.") + 
-  ggtitle("SFUSD health, pension, and OPEB cash expenditures as % of current education expense",
-          subtitle="General fund only. Current expenses adjusted to include OPEB payments.") +
+  ggtitle("SFUSD health, pension, and OPEB expenditures as % of current education expense",
+          subtitle="General fund only. Current expenses adjusted to include OPEB payments. Current expenses and pension payments adjusted to remove state payments to TRS on behalf of districts.") +
   theme_bw() +
   theme(plot.caption = element_text(hjust = 0, face="italic")) +
   legend_notitle
@@ -180,8 +161,8 @@ write_csv(pdata, here::here("results", "benefit_shares_data.csv"))
 
 ```
 
-
 ## SFUSD real per-pupil current educational spending on benefits and other items
+
 ```{r rpp}
 # Gross domestic product (chain-type price index)
 # FRED https://fred.stlouisfed.org/series/A191RG3A086NBEA
@@ -193,15 +174,14 @@ gdppi <- price %>%
   select(year, gdppi, igdppi)
 
 
-df <- sacs_gfcurrent %>%
+xpp <- sacs_gfcurrent %>%
   filter(eval(sfusd)) %>%
   left_join(leas %>% 
               filter(eval(sfusd)) %>%
               select(year, ccode, dcode, k12ada), 
             by = c("ccode", "dcode", "year")) %>%
   left_join(gdppi %>% select(year, igdppi), by="year") %>%
-  mutate(currentadj=current + gfopeb, # opeb is not in current expenses
-         retben=gfopeb + ercpen,
+  mutate(retben=gfopeb + ercpenadj,
          salaries=certsals + classsals) %>%  
   pivot_longer(-c(year, ccode, dcode, dname, k12ada, igdppi)) %>%
   mutate(xpp=value / k12ada,  # expenditures per pupil
@@ -210,9 +190,12 @@ df <- sacs_gfcurrent %>%
 ```
 
 
+### Plot over time
 ```{r rpp_plot, include=TRUE}
-names(sacs_gfcurrent)
-df %>%
+# names(sacs_gfcurrent)
+capt <- "Note: retirement benefits include OPEB cash payments, and exclude state contributions to CalSTRS on behalf of districts"
+
+p <- xpp %>%
   filter(name %in% c("service", "retben", "salaries", "health")) %>%
   ggplot(aes(year, rxpp, colour=name)) +
   geom_line() +
@@ -221,49 +204,142 @@ df %>%
   scale_x_continuous(name=NULL) +
   ggtitle("Expenditures per pupil, 2020 dollars",
           subtitle = "Salaries, services, retirement benefits (pension + OPEB), and employee health") +
+  labs(caption=str_wrap(capt, 80)) + 
   theme_bw() +
+  caption_left +
   legend_notitle
+p
 
 ```
 
-
-
-## SFUSD OPEB nominal amounts
-```{r include=FALSE}
-df %>%
-  filter(eval(sfusd)) %>%
-  select(year, contains("opeb")) %>%
-  pivot_longer(cols = -year) %>%
-  ggplot(aes(year, value / 1e6, colour=name)) +
-  geom_line() +
-  geom_point() +
-  scale_y_continuous(name = "$ millions", breaks=seq(0, 100, 5), limits=c(0, NA)) +
-  ggtitle("San Francisco GF OPEB benefit expenditures")
-  
-  
-```
-
-# SFUSD OPEB as % of total spending
+### Table of real per pupil general fund spending at key points in time
 ```{r include=TRUE}
-df %>%
-  filter(eval(sfusd)) %>%
-  mutate(opebpct=totopeb / (current + totopeb)) %>%
-  ggplot(aes(year, opebpct)) +
-  geom_line() +
-  geom_point() +
-  scale_y_continuous(name = "% of spending", labels = scales::percent) +
-  ggtitle("San Francisco GF OPEB benefit expenditures as % of total spending")
+# count(xpp, name)
+# names <- c("currentadj", "health", "salaries", "gfopeb", "ercpenadj", "books")
+tabdata <- xpp %>%
+  select(year, name, rxpp) %>%
+  filter(year %in% seq(2000, 2020, 5),
+         name %in% names) %>%
+  pivot_wider(names_from = name, values_from = rxpp, values_fill = 0) %>%
+  mutate(other=currentadj - rowSums(across(-c(year, currentadj)))) %>%
+  pivot_longer(-year) %>%
+  pivot_wider(names_from = year, names_prefix = "y") %>%
+  mutate(change=y2020 - y2015,
+         pchange=change / y2020) %>%
+  mutate(group=ifelse(name=="other", 2, 1)) %>%
+  arrange(group, -y2020) %>%
+  select(-group)
+
+tabdata %>%
+  gt() %>%
+  tab_header(
+      title = "Real per-pupil general fund expenditures in SFUSD",
+      subtitle = "2020 dollars (GDP price index)"
+    ) %>%
+    fmt_number(
+      columns = c(starts_with("y"), change),
+      decimals = 0,
+      suffixing = FALSE
+    ) %>%
+    fmt_percent(
+      columns = "pchange",
+      decimals = 1
+    )
+
 ```
 
 
-# Top OPEB-as-% of spending large districts
-```{r include=TRUE}
+## Top OPEB spending districts (general fund)
+
+```{r}
+opebdf <- sacs_gfcurrent %>%
+  select(year, ccode, dcode, dname, currentadj, gfopeb) %>%
+  left_join(leas %>% select(year, ccode, dcode, k12ada), 
+            by = c("year", "ccode", "dcode")) %>%
+  mutate(share=gfopeb / currentadj,
+         opebpp=gfopeb / k12ada,
+         sfusd=eval(sfusd))
+
+```
+
+
+A few quick exploratory graphs
+
+```{r}
+# find oddities
+opebdf %>%
+  filter(year==2020) %>%
+  select(ccode, dcode, dname, k12ada, gfopeb, opebpp, share) %>%
+  arrange(desc(share))
+# drop ccode 19	dcode 40139	Pupil Transportation Co-Op JPA, which is 100%
+
+# a lot of the oddities have k12ada <= 100
+opebdf %>%
+  filter(year==2020, k12ada > 0) %>%
+  select(ccode, dcode, dname, k12ada, gfopeb, opebpp, share) %>%
+  arrange(desc(opebpp))
+
+opebdf %>%
+  filter(year==2020, k12ada >= 100) %>%
+  select(ccode, dcode, dname, k12ada, gfopeb, opebpp, share) %>%
+  arrange(desc(opebpp))
+
+opebdf %>%
+  filter(year==2020) %>%
+  select(ccode, dcode, dname, k12ada, gfopeb, opebpp, share) %>%
+  arrange(desc(k12ada))
+
+
+drops <- expression(ccode==19 & dcode==40139)
+
+
+```
+
+
+```{r opeb_share, include=TRUE}
+
+opebdf %>%
+  filter(year==2020, !eval(drops), share > .005, k12ada >= 1000) %>%
+  ggplot(aes(k12ada, share, colour=sfusd)) +
+  geom_point() +
+  scale_x_log10(labels=comma) +
+  scale_y_continuous(labels=percent) +
+  # scale_y_log10(labels=percent) +
+  ggtitle("OPEB as % of adjusted current expenditures, General Fund, 2020",
+          subtitle="By district size (attendance), log10 scale") +
+  labs(caption="Districts with at least 1,000 students. Several outliers excluded.") +
+  caption_left
+   
+
+
+```
+
+
+```{r}
+
+```
+
+```{r opeb_ada}
+# relative to attendance
+opebdf %>%
+  filter(year==2020, !eval(drops), k12ada > 0, opebpp > 0) %>%
+  ggplot(aes(k12ada, opebpp, colour=sfusd)) +
+  geom_point() +
+  scale_x_log10(labels=comma) +
+  # scale_y_log10() + # labels=comma
+  scale_y_continuous(limits=c(0, 1600)) +
+  ggtitle("OPEB expenditures per pupil, General Fund, 2020",
+          subtitle="By district size (attendance) on log10 scale") +
+  labs(caption="Several outliers excluded") +
+  caption_left
+
 
 
 ```
 
 
 # J-90 OPEB data
+
 ```{r}
 opeb_j90 <- readRDS(paste0(dj90_all, "opeb.rds"))
 
@@ -283,4 +359,3 @@ opeb_j90 %>%
   scale_x_continuous("annual cost to the participant", labels=scales::comma) +
   ggtitle("SFUSD retired OPEB participants and per-retiree plan costs in 2020")
 ```
-
