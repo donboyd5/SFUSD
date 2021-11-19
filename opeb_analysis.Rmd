@@ -126,6 +126,20 @@ system.time(all_sacs <- readRDS(paste0(dsacs_all, "all_sacs.rds")))  # 30 secs
 sacs_gfcurrent <- readRDS(file=paste0(dsacs_all, "sacs_gfcurrent.rds"))
 leas <- readRDS(file=paste0(dsacs_all, "leas.rds"))  # local education agencies -- for k12ada
 
+# str_detect(dname, coll("county", ignore_case = TRUE)
+# Alameda 1 · Napa 28 · Santa Clara 43 · Contra Costa 7 · San Francisco 38 · Solano 48 · Marin 21 · San Mateo 41 · Sonoma 49
+baycodes <- c(1, 28, 43, 7, 38, 48, 21, 41, 49)
+counties <- leas %>% 
+  filter(year==2020, dtype=="CO OFFICE") %>%
+  select(ccode, dcode, dname) %>%
+  mutate(coname=str_extract(dname, ".+?(?= County)"),
+         bayarea=ccode %in% baycodes)
+counties
+# (?= County) means look before " County"
+# .+? means get everything
+
+counties %>% filter(bayarea)
+
 
 ```
 
@@ -469,7 +483,7 @@ tabdata %>%
 ```
 
 
-### Large districts' general fund OPEB spending over time
+### California large districts' general fund OPEB spending over time
 
 ```{r fig.height=8, fig.width=8, include=TRUE}
 # get large districts
@@ -512,6 +526,61 @@ p
 
 ```
 
+
+### Bay Area large districts' general fund OPEB spending over time
+```{r bay_unified, fig.height=8, fig.width=8, include=TRUE}
+# Alameda · Napa · Santa Clara · Contra Costa · San Francisco · Solano · Marin · San Mateo · Sonoma
+n <- 25
+
+bay_unified <- 
+  # get bay area unifieds
+  leas %>%
+  filter(year==2020, ccode %in% baycodes, dtypef=="unified") %>%
+  select(ccode, dcode, dname) %>%
+  # get county name
+  left_join(counties %>% select(ccode, coname), by=c("ccode")) %>%
+  # get opebpp
+  left_join(opeb2 %>%
+              filter(year==2020, ccode %in% baycodes) %>%
+              select(year, ccode, dcode, k12ada, opebpp),
+            by=c("ccode", "dcode")) %>%
+  # sort by size then keep top n
+  arrange(desc(k12ada)) %>%
+  filter(row_number() <= n) %>%
+  # sort by opebpp in 2020 to use for plot order
+  arrange(desc(opebpp)) %>%
+  mutate(codist=paste0(coname, ": ", dname),
+         sort=row_number()) %>%
+  select(year, ccode, dcode, dname, codist, k12ada, opebpp, sort)
+
+
+
+# get plot data
+pdata <- bay_unified %>%
+  select(ccode, dcode, codist) %>%  # use the 2020 name as they can change over time
+  left_join(opeb2 %>%
+              select(year, ccode, dcode, activespp, retiredpp, opebpp),
+            by = c("ccode", "dcode")) %>%
+  pivot_longer(cols=(ends_with("pp"))) %>%
+  mutate(codist2=factor(codist, levels=bay_unified$codist))
+
+p <- pdata %>%
+  filter(name=="opebpp") %>%
+  arrange(codist2) %>%
+  ggplot(aes(year, value)) +
+  geom_line(colour="blue") +
+  geom_point(colour="blue") +
+  theme_bw() +
+  facet_wrap(~codist2, ncol=5, labeller=label_wrap_gen(width = 37, multi_line = TRUE)) +
+  ggtitle(label="General Fund OPEB expenditures per pupil over time. CAUTION: Nominal.",
+          subtitle="25 largest Bay Area school districts, by attendance. Districts ordered by 2020 per-pupil OPEB spending.") +
+  scale_y_continuous(name="$ per pupil", labels=comma) +
+  scale_x_continuous(name=NULL) +
+  labs(caption="NOTE: Includes payments for retirees plus any trust contributions for actives") +
+  caption_left
+p  
+
+```
 
 
 ```{r doc_opeb}
@@ -598,6 +667,68 @@ opeb_j90 <- readRDS(paste0(dj90_all, "opeb.rds"))
 ```
 
 
+## Districts that provide benefits for age 66+ retirees
+
+```{r}
+# explore
+tmp <- opeb_j90 %>%
+  select(year, ccode, dcode, dname, ben_life, ben_stop) %>%
+  arrange(year, ccode, dcode) %>%
+  group_by(year, ccode, dcode) %>%
+  filter(row_number()==1) %>%
+  ungroup %>%
+  mutate(ben65p=(ben_stop > 65) | (ben_life=="Y"))
+
+tmp %>%
+  filter(year==2020) %>%
+  group_by(ben_life) %>%
+  summarise(stopmin=min(ben_stop), stopmdn=median(ben_stop), stopmax2=max(ben_stop * (ben_stop < 999)))
+
+count(tmp, year, ben65p) %>%
+  pivot_wider(names_from = ben65p, values_from = n) %>%
+  mutate(pct=`TRUE` / (`TRUE` + `FALSE`))
+
+```
+
+
+```{r benagem, include=TRUE}
+tabdata <- opeb_j90 %>%
+  filter(plantype=="health") %>%
+  select(year, ccode, dcode, dname, ben_life, ben_stop) %>%
+  arrange(year, ccode, dcode) %>%
+  group_by(year, ccode, dcode) %>%
+  filter(row_number()==1) %>%
+  ungroup %>%
+  mutate(ben65p=(ben_stop > 65) | (ben_life=="Y"),
+         ben65p=ifelse(ben65p, "yes", "no")) %>%
+  group_by(year, ben65p) %>%
+  summarise(n=n(), .groups="drop") %>%
+  pivot_wider(names_from = ben65p, values_from = n) %>%
+  mutate(total=yes + no, pctyes=yes / total)
+
+tabdata %>%
+  gt() %>%
+  tab_header(
+      title = "Districts that provide OPEB health benefits beyond age 65",
+      subtitle = "ONLY includes districts that provide OPEB health benefits"
+    )  %>%
+    fmt_number(
+      columns = c(no, yes, total),
+      decimals = 0,
+      suffixing = FALSE
+    )  %>%
+    fmt_percent(
+      columns = pctyes,
+      decimals = 1
+    ) %>%
+  tab_source_note("Source: J-90 data")
+
+
+```
+
+
+
+
 ## SFUSD by plan type - cost and ftes
 ```{r plantype, include=TRUE}
 rows <- opeb_j90 %>%
@@ -624,9 +755,22 @@ tabdata <- bind_rows(rows, sumrow) %>%
 tabdata %>%
   gt() %>%
   tab_header(
-      title = "SFUSD estimated OPEB FTEs and costs, plan year 2029",
+      title = "SFUSD estimated OPEB FTEs and costs, plan year 2020",
       subtitle = "Source: J-90 data"
     )  %>%
+  cols_label(
+    n=html("Number<br>of plans"),
+    minfte="min",
+    maxfte="max",
+    sumfte="total",
+    toteecost=html("Total employee cost"),
+    totercost=html("Total employer cost"),
+    totcost=html("Total cost"),
+    ershare=html("Employer share")
+  ) %>%
+  tab_spanner(label="# of OPEB FTEs (i.e., retirees)",
+              columns=contains("fte")
+              ) %>%
   tab_spanner(
     label = "$ millions",
     columns = contains("tot")
@@ -644,7 +788,65 @@ tabdata %>%
     fmt_percent(
       columns = ershare,
       decimals = 1
+    )%>%
+  tab_footnote(
+    footnote = "CAUTION: cost estimates based on J-90 are overestimates but employer share is plausible.",
+    locations = cells_column_labels(
+      columns = starts_with("tot")
     )
+  )
+
+
+```
+
+
+# OPEB by age
+```{r include=TRUE}
+rows <- opeb_j90 %>%
+  filter(eval(sfusd), year==2020, opebfte > 0, plantype=="health") %>%
+  group_by(agecat) %>%
+  summarise(across(starts_with("tot"), sum))
+
+tabdata <- rows %>%
+  bind_rows(rows %>% summarise(across(starts_with("tot"), sum)) %>%
+              mutate(agecat="total")) %>%
+  pivot_longer(-agecat) %>%
+  pivot_wider(names_from = agecat) %>%
+  mutate(name=factor(name,
+                     levels=c("totercost", "toteecost", "totcost"),
+                     labels=c("District", "Retiree", "Total")),
+         age66pshare=age66p / total) %>%
+  arrange(name)
+
+
+tabdata %>%
+  gt() %>%
+  tab_header(
+      title = "SFUSD estimated retiree and district costs by age group, plan year 2020",
+      subtitle = "Source: J-90 data"
+    )  %>%
+  cols_label(
+    name="Cost paid by:",
+    under66=html("Under age 66"),
+    age66p=html("Age 66+"),
+    total=("Total"),
+    age66pshare=html("Age 66+ as %<br>of total cost")
+  ) %>%
+  fmt_number(
+      columns = c(under66, age66p, total),
+      decimals = 0,
+      suffixing = FALSE
+    )  %>%
+  fmt_percent(
+      columns = age66pshare,
+      decimals = 1
+    ) %>%
+  tab_footnote(
+    footnote = "CAUTION: cost estimates based on J-90 may be overestimates.",
+    locations = cells_column_labels(
+      columns = c(under66, age66p, total)
+    )
+  )
 
 
 ```
@@ -652,8 +854,7 @@ tabdata %>%
 
 
 
-
-```{r}
+```{r sfusd_health, include=TRUE, fig.width=6, fig.height=6}
 opeb_j90 %>%
   filter(eval(sfusd)) %>%
   filter(plantype=="health") %>%
@@ -665,5 +866,6 @@ opeb_j90 %>%
   geom_text(nudge_x = 750, size=3) +
   scale_y_continuous("# of participants", labels = scales::comma) +
   scale_x_continuous("annual cost to the participant", labels=scales::comma) +
-  ggtitle("SFUSD retired OPEB participants and per-retiree plan costs in 2020")
+  ggtitle("SFUSD OPEB health plans: # of retired participants and per-retiree plan costs in 2020",
+          "Size of dot and number represent share of district OPEB health costs.")
 ```
