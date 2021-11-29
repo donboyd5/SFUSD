@@ -45,9 +45,9 @@ df4 <- df3 %>%
   filter(str_detect(employer, coll("SAN FRAN", ignore_case = TRUE)))
 count(df4, employer)
 
-fn3 <- "sfers-san-francisco-employees-retirement-system-2019.csv"
+fn3 <- "sfers-san-francisco-employees-retirement-system-2017.csv"
 df5 <- read_csv(paste0(dir, fn3))
-count(df5, job_title) %>% arrange(-n)
+tmp <- count(df5, job_title) %>% arrange(-n)
 
 
 df2 %>%

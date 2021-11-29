@@ -727,6 +727,58 @@ tabdata %>%
 ```
 
 
+```{r check}
+# tabdata <- opeb_j90 %>%
+#   filter(plantype=="health") %>%
+#   select(year, ccode, dcode, dname, ben_life, ben_stop) %>%
+#   arrange(year, ccode, dcode, planseq, coverage) %>%
+#   group_by(year, ccode, dcode) %>%
+#   filter(row_number()==1) %>%
+#   ungroup %>%
+#   mutate(ben65p=(ben_stop > 65) | (ben_life=="Y"),
+#          ben65p=ifelse(ben65p, "yes", "no")) %>%
+#   group_by(year, ben65p) %>%
+#   summarise(n=n(), .groups="drop") %>%
+#   pivot_wider(names_from = ben65p, values_from = n) %>%
+#   mutate(total=yes + no, pctyes=yes / total)
+
+temp <- opeb_j90 %>%
+  filter(plantype=="health") %>%
+  select(year, ccode, dcode, dname, ben_life, ben_stop) %>%
+  arrange(year, ccode, dcode) %>%
+  group_by(year, ccode, dcode) %>%
+  filter(row_number()==1) %>%
+  ungroup %>%
+  mutate(ben65p=(ben_stop > 65) | (ben_life=="Y"),
+         ben65p=ifelse(ben65p, "yes", "no"))
+
+temp %>%
+  filter(ccode==1, dcode==61119)
+
+temp %>%
+  filter(ben65p=="no", year==2020)
+
+
+check <- opeb_j90 %>%
+  filter(plantype=="health", year==2019, 
+         # ccode %in% baycodes, 
+         str_detect(dname, coll("unified", ignore_case = TRUE))) %>%
+  select(year, ccode, dcode, dname, agecat, ben_life, ben_stop, provider,
+         planseq, coverage, opebfte, plancost, planercost, planeecost) %>%
+  arrange(year, ccode, dcode, agecat, planseq) %>%
+  mutate(ben65p=(ben_stop > 65) | (ben_life=="Y"),
+         ben65p=ifelse(ben65p, "yes", "no"))
+
+check %>%
+  filter(ccode==1, dcode==61127) # no, Albany
+
+check %>%
+  filter(ccode==1, dcode==61119) # yes, Alameda
+
+
+```
+
+
 
 
 ## SFUSD by plan type - cost and ftes
