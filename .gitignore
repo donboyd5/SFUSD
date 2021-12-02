@@ -6,3 +6,4 @@ data/
 results/
 *.rds
 alameda*
+*.html
