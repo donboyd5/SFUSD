@@ -1,0 +1,57 @@
+
+  summary_rows(
+    groups = TRUE,
+    columns = erpct,
+    fns = list(Total = ~ sum(.)),
+    formatter = fmt_percent,
+    decimals = 1
+  ) %>%
+  summary_rows(
+    groups = TRUE,
+    columns = opebfte,
+    fns = list(Total = ~ sum(.)),
+    formatter = fmt_number,
+    decimals = 0
+  ) %>%
+  summary_rows(
+    groups = TRUE,
+    columns = planercost,
+    fns = list(Total = ~ sum(.data$opebfte)),
+    formatter = fmt_number,
+    decimals = 0
+  ) %>%
+  # summary_rows(
+  #   groups = TRUE,
+  #   columns = "planercost",
+  #   fns = list(Total = ~ precomp$planercost[1]),
+  #   formatter = fmt_number,
+  #   decimals = 0
+  # ) %>%
+  summary_rows(
+    groups = TRUE,
+    columns = planercost,
+    fns = list(Total = ~ tabdata %>% group_by(agecat) %>% summarise(value=sum(opebfte)) %>% .$value),
+    formatter = fmt_number,
+    decimals = 0
+  ) %>%
+  summary_rows(
+    groups = NULL,
+    columns = erpct,
+    fns = list(`Grand Total` = "sum"),
+    formatter = fmt_percent,
+    decimals = 1
+  ) %>%
+  summary_rows(
+    groups = NULL,
+    columns = opebfte,
+    fns = list(`Grand Total` = "sum"),
+    formatter = fmt_number,
+    decimals = 0
+  ) %>%
+  summary_rows(
+    groups = TRUE,
+    columns = plancost,
+    fns = list(`Grand Total` = ~ 5 * x),
+    formatter = fmt_number,
+    decimals = 0
+  ) 
