@@ -1943,6 +1943,151 @@ gtsave(tab, here::here("results", "j90_sfusd_vs_means.png"))  # , zoom = 1.5, ex
 
 
 
+### Version that includes non-offering districts in the age 65+ statistics
+```{r plan_costs_ftes_means_v2, include=TRUE}
+
+# get a list of all districts that offer OPEB health with values for agecat values
+opeb_dists <- opeb_j90 %>%
+  filter(plantype=="health", year==2020, eval(topada), opebfte > 0, agecat %in% c("under66", "age66p")) %>%
+  select(year, ccode, dcode, dname, plantype, k12ada) %>%
+  distinct
+
+agecats <- opeb_j90 %>% 
+  select(agecat, agecatf) %>%
+  distinct() %>%
+  filter(!is.na(agecat))
+
+
+opeb_offered <- expand_grid(opeb_dists, 
+                            agecats)
+count(opeb_offered, agecat, agecatf)
+
+opeb_base <- opeb_offered %>%
+  left_join(opeb_j90 %>%
+              select(year, ccode, dcode, dname, plantype, agecat, opebfte, starts_with("tot")),
+            by = c("year", "ccode", "dcode", "dname", "plantype", "agecat")) %>%
+  select(year, ccode, dcode, dname, plantype, agecat, agecatf, opebfte, starts_with("tot"))
+
+opeb_base %>% filter(eval(sfusd))
+  
+
+
+opeb_base2 <- opeb_base %>%
+  mutate(across(c(opebfte, starts_with("tot")), ~ replace_na(.x, 0)),  # set values to zero if we did not match
+         across(c(opebfte, starts_with("tot")), ~ ifelse(.x < 0, 0, .x))) %>% # 2 oddball negatives
+  group_by(year, ccode, dcode, dname, agecat, agecatf) %>%
+  summarise(across(c(opebfte, starts_with("tot")), sum), .groups="drop",
+            k12ada=first(k12ada)) %>%
+  mutate(across(c(totcost, totercost, toteecost), ~ .x / opebfte),  # average costs
+         kfteada=opebfte / (k12ada / 1000)) 
+distbase %>% filter(eval(sfusd))
+summary(distbase)
+count(distbase, agecat)
+
+distcosts <- distbase %>%
+  select(year, ccode, dcode, dname, agecat, agecatf, starts_with("tot")) %>%
+  pivot_longer(cols=c(totcost, totercost, toteecost))
+
+distftes <- distbase %>%
+  select(year, ccode, dcode, dname, agecat, agecatf, value=kfteada) %>%
+  mutate(name="kfteada")
+
+distvals <- bind_rows(distcosts, distftes) %>%
+  arrange(year, ccode, dcode, dname, agecat, name)
+
+sfusdvals <- distvals %>%
+  filter(eval(sfusd)) %>%
+  mutate(group="SFUSD")
+
+meanvals <- distvals %>%
+  group_by(agecat, agecatf, name) %>%
+  summarise(value=mean(value), .groups="drop") %>%
+  mutate(group="mean")
+
+vals <- c("kfteada")
+
+fctrs <- tribble(
+  ~lev, ~lab,
+  "kfteada", "OPEB participants per 1,000 pupils",
+  "totcost", "Total plan premium cost",
+  "totercost", "District portion of plan premium cost",
+  "toteecost", "Participant portion of plan premium cost",
+  "ershare", "District % share of premium cost"
+)
+
+tabdata <- bind_rows(meanvals, sfusdvals) %>%
+  select(group, agecat, agecatf, name, value) %>%
+  pivot_wider() %>%
+  mutate(ershare=totercost / totcost) %>%
+  pivot_longer(cols=-c(group, agecat, agecatf)) %>%
+  pivot_wider(names_from = group) %>%
+  mutate(pctdiff=ifelse(name=="ershare", SFUSD - mean, SFUSD / mean - 1),
+         name=factor(name, levels=fctrs$lev, labels=fctrs$lab))
+
+tab <- tabdata %>%
+  select(-agecat) %>%
+  group_by(agecatf) %>%
+  gt() %>%
+  tab_header(
+      title = paste0("Retiree health plan participants and premium costs"),
+      subtitle = "Younger retirees and older retirees"
+    ) %>%
+  cols_label(
+    name="",
+    mean=html("Mean<br>across<br>districts"),
+    pctdiff=html("SFUSD<br>% above<br>or below<br>mean")
+  ) %>%
+  # cols_align(align="center") %>%
+  cols_align(
+    align="left",
+    columns=name
+  ) %>%
+  # cols_align(align="left") %>%
+  fmt_currency(
+    columns = c(mean, SFUSD),
+    decimals = 0,
+    suffixing = FALSE
+  ) %>%
+  fmt_number(
+    columns=c(mean, SFUSD),
+    rows=c(1, 6),
+    decimals=1
+  ) %>%
+  fmt_percent(
+    columns = c(mean, SFUSD),
+    rows=c(5, 10),
+    decimals = 1
+  ) %>%
+  fmt_percent(
+    columns = pctdiff,
+    decimals = 1
+  ) %>%
+  cols_width(
+    c(mean, SFUSD, pctdiff) ~ px(100),
+    name ~ px(300)
+  ) %>%
+  tab_style(
+    style = list(
+      cell_fill(color = "grey90"),
+      cell_text(size = px(15), weight = "bold", font = "arial")
+      ),
+    locations = cells_row_groups()
+  ) %>%
+  tab_footnote(
+    footnote = "Calculated as SFUSD minus mean.",
+    locations = cells_body(
+      columns = pctdiff,
+      rows = str_detect(name, "%"))
+  ) %>%
+  tab_source_note(paste0("Source: ", j90_source))
+
+tab  
+
+gtsave(tab, here::here("results", "j90_sfusd_vs_means_v2.png"))  # , zoom = 1.5, expand = 10)
+
+```
+
+
 
 # District costs by whether district provides benefits for ages 65+
 ```{r}
