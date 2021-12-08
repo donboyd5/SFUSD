@@ -880,24 +880,24 @@ pdata %>%
 
 This is important because if we see that trends for teachers and classified are similar, we will feel better about drawing conclusions based on J-90 data, which are for teachers (certificated employees) only.
 
-```{r tchr_class, include=TRUE}
+```{r tchr_class, include=FALSE}
 
-opeb2 %>%
-  filter(eval(sfusd)) %>%
-  select(year, teacherpp, classifiedpp, opebpp) %>%
-  pivot_longer(-year) %>%
-  mutate(name=factor(name, 
-                     levels=c("opebpp", "teacherpp", "classifiedpp"),
-                     labels=c("total", "teachers", "classified"))) %>%
-  ggplot(aes(year, value, colour=name)) +
-  geom_line() +
-  geom_point() +
-  scale_x_continuous(name=NULL) +
-  scale_y_continuous(name="$ per pupil", limits=c(0, NA)) +
-  ggtitle(label="SFUSD nominal general fund OPEB expenditures on retirees, per pupil",
-          subtitle="By pre-retirement job category") +
-  theme_bw() +
-  legend_notitle
+# opeb2 %>%
+#   filter(eval(sfusd)) %>%
+#   select(year, teacherpp, classifiedpp, opebpp) %>%
+#   pivot_longer(-year) %>%
+#   mutate(name=factor(name, 
+#                      levels=c("opebpp", "teacherpp", "classifiedpp"),
+#                      labels=c("total", "teachers", "classified"))) %>%
+#   ggplot(aes(year, value, colour=name)) +
+#   geom_line() +
+#   geom_point() +
+#   scale_x_continuous(name=NULL) +
+#   scale_y_continuous(name="$ per pupil", limits=c(0, NA)) +
+#   ggtitle(label="SFUSD nominal general fund OPEB expenditures on retirees, per pupil",
+#           subtitle="By pre-retirement job category") +
+#   theme_bw() +
+#   legend_notitle
 
 ```
 
