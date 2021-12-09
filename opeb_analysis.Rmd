@@ -14,6 +14,7 @@ editor_options:
 ---
 
 # SETUP SECTION
+
 ```{r setup, eval=TRUE, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 
 # note that eval=TRUE unless set to FALSE
@@ -84,7 +85,9 @@ j90_source <- "California Department of Education J-90 salary and benefits data"
 
 
 # DATA PREPARATION SECTION
+
 ## ONETIME dataset creation
+
 ```{r ONETIME_gdppi_save, eval=FALSE}
 # isolate this so abd save it we don't keep rerunning it
 
@@ -101,6 +104,7 @@ saveRDS(gdppi, here::here("data", "gdppi.rds"))
 ```
 
 ## Load important previously created datasets
+
 ```{r load_gdppi}
 gdppi <- readRDS(here::here("data", "gdppi.rds"))
 
@@ -126,7 +130,6 @@ mjsd <- mj2 %>%
 
 ```
 
-
 ```{r load_sacs}
 #.. all SACS ----
 system.time(all_sacs <- readRDS(paste0(dsacs_all, "all_sacs.rds")))  # 30 secs
@@ -137,10 +140,7 @@ sacs_gfcurrent <- readRDS(file=paste0(dsacs_all, "sacs_gfcurrent.rds"))
 #.. SACS Local Education Agencies list ----
 leas <- readRDS(file=paste0(dsacs_all, "leas.rds"))  # local education agencies -- for k12ada
 
-# str_detect(dname, coll("county", ignore_case = TRUE)
-
 ```
-
 
 ```{r load_j90}
 opeb_j90 <- readRDS(paste0(dj90_all, "opeb.rds")) %>%
@@ -161,8 +161,8 @@ glimpse(opeb_j90)
 
 ```
 
-
 ## Definitions for areas and factors
+
 ```{r}
 #.. sfusd ----
 sfusd <- expression(ccode==38 & dcode==68478)
@@ -177,9 +177,8 @@ topada <- expression(k12ada >= 1000)  # >= 1000 is my cutoff
 
 ```
 
-
-
 ## Create important data extracts and summaries
+
 ```{r}
 #.. counties and county offices of education ----
 counties <- leas %>% 
@@ -194,7 +193,6 @@ counties
 counties %>% filter(bayarea)
 
 ```
-
 
 ```{r sacs_rxpp}
 #.. SACS real expenditures per pupil ----
@@ -213,7 +211,6 @@ xpp <- sacs_gfcurrent %>%
          rxpp=xpp * igdppi)
 
 ```
-
 
 ```{r opebdf}
 #.. opebdf: per-pupil SACS data on general fund opeb spending ----
@@ -255,57 +252,7 @@ opebdf <- sacs_gfcurrent %>%
 # ns(sacs_gfcurrent)
 ```
 
-
 ## Miscellaneous data checks
-
-```{r j90_misc}
-
-# opeb_j90 %>%
-#   filter(year==2020) %>%
-#   write_csv(here::here("data", "joffe_j90_2020.csv"))
-# 
-# #.. districts in 2019 not in 2020 (there was a drop in # of districts in 2020) ----
-# tmp <- opeb_j90 %>%
-#   filter(year %in% 2019:2020) %>%
-#   select(year, ccode, dcode, dname, ada) %>%
-#   distinct %>%
-#   pivot_wider(names_from = year, values_from = ada) %>%
-#   filter(is.na(`2020`))
-# sum(tmp$`2019`, na.rm=TRUE)
-# 
-# tmp2 <- opeb_j90 %>%
-#   filter(year==2020, plantype=="health") %>%
-#   group_by(year, ccode, dcode, dname, agecat) %>%
-#   summarise(across(c(opebfte, totercost, toteecost, totcost), sum))
-# 
-# tmp3 <- tmp2 %>%
-#   select(year, ccode, dcode, dname, agecat, value=totercost) %>%
-#   pivot_wider(names_from = agecat, values_fill = 0) %>%
-#   mutate(agesum=under66 + age66p,
-#          pct66p=age66p / agesum) %>%
-#   arrange(desc(pct66p))
-# 
-# 
-# tmp3a <- tmp2 %>%
-#   select(year, ccode, dcode, dname, agecat, value=opebfte) %>%
-#   pivot_wider(names_from = agecat, values_fill = 0) %>%
-#   mutate(agesum=under66 + age66p,
-#          pct66p=age66p / agesum,
-#          ratio=age66p / under66) %>%
-#   arrange(desc(pct66p))
-# 
-# tmp3a %>%
-#   mutate(cover=age66p > 0) %>%
-#   group_by(cover) %>%
-#   summarise(qtiledf(ratio))
-# 
-# summary(tmp3)
-# quantile(tmp3$pct66p, c(0, .05, .1, .25, .5, .75, .8, .85, .9, .95, 1), na.rm=TRUE)
-# tmp3 %>%
-#   group_by(pct66p==0) %>%
-#   summarise(n=n())
-```
-
 
 # ANALYSIS BEGINS HERE
 
@@ -335,8 +282,8 @@ mjsd %>%
 
 ```
 
-
 # SACS financial data
+
 ## NOT USED: SFUSD Health, pension, and OPEB benefits as % of general fund
 
 ```{r shares, include=FALSE, fig.width=10, fig.height=6.5}
@@ -372,6 +319,7 @@ p
 ## NOT USED: SFUSD real per-pupil current educational spending on benefits and other items
 
 ### Plot over time
+
 ```{r rpp_plot, include=FALSE}
 # names(sacs_gfcurrent)
 # names(xpp)
@@ -394,7 +342,8 @@ p
 
 ```
 
-### NOT USED: Table of real per pupil general fund spending at key points in time
+### Table of real per pupil general fund spending at key points in time
+
 ```{r include=FALSE}
 # count(xpp, name)
 names <- c("currentadj", "health", "salaries", "gfopeb", "ercpenadj", "books")
@@ -430,9 +379,8 @@ tabdata %>%
 
 ```
 
-## General fund OPEB spending
-
 ## REPORT: OPEB ranking table
+
 ```{r opeb_ranks, include=TRUE}
 
 # show top n, median of 25-largest bay area districts, median overall
@@ -533,6 +481,7 @@ write_csv(tabdata, here::here("results", "opebpp_topn_ranking_data.csv"))
 ```
 
 ## REPORT: Scatterplot OPEB per pupil vs. attendance, log scale
+
 ```{r opeb_ada_plot, include=TRUE}
 
 healdsburg <- expression(ccode==49 & dcode==75390) # Healdsburg Unified -- high outlier
@@ -598,6 +547,7 @@ write_csv(pdata, here::here("results", "opebpp_data.csv"))
 ```
 
 ## REPORT: Table of districts by OPEB size
+
 ```{r opebsize_table, include=TRUE}
 # define cut points and cut labels
 gcuts <- c(-Inf, 0, 50, 100, 200, 300, 400, 500, 750, Inf)
@@ -692,6 +642,7 @@ write_csv(tabdata, here::here("results", "opebpp_byopebsize_ptliles_data.csv"))
 ```
 
 ## REPORT: Line plot Bay Area large districts' general fund OPEB spending over time
+
 ```{r bay_unified, fig.height=8, fig.width=8, include=TRUE}
 # Alameda · Napa · Santa Clara · Contra Costa · San Francisco · Solano · Marin · San Mateo · Sonoma
 topn <- 25
@@ -736,6 +687,7 @@ write_csv(pdata, here::here("results", "bayarea_ropebpp_data.csv"))
 ```
 
 ## NOT USED (prob too complicated for audience): Percent of districts by OPEB size group
+
 ```{r include=TRUE}
 
 gcuts <- c(-Inf, 0, 50, 100, 200, 300, 400, 500, 750, Inf)
@@ -847,211 +799,23 @@ tab
 
 ```
 
-
-
-
-
-# NOT USED: Why are SFUSD costs so high?
-## Certificated vs. classified
-```{r include=FALSE}
-sizecut <- 1000
-
-pdata1 <- opebdf %>%
-  filter(k12ada > 0) %>%
-  filter(year==2020, k12ada >= sizecut, opebpp >= 0) %>%  # drop negative opebpp
-  filter(!(is.na(k12ada) | is.na(opebpp))) %>%
-  select(ccode, dcode, coname, dname, bayarea, year, k12ada, opebpp, teacherpp, classifiedpp) %>%
-  mutate(across(c(opebpp, teacherpp, classifiedpp), list(i=function(.x) .x / median(.x))))
-
-pdata %>%
-  filter(year==2020) %>%
-  mutate(tshare=teacherpp / opebpp) %>%
-  group_by(sfusd) %>%
-  summarise(qtiledf(tshare), .groups="drop")
-
-```
-
-
-
-
-### Teachers and classified
-
-#### SFUSD over time
-
-This is important because if we see that trends for teachers and classified are similar, we will feel better about drawing conclusions based on J-90 data, which are for teachers (certificated employees) only.
-
-```{r tchr_class, include=FALSE}
-
-# opeb2 %>%
-#   filter(eval(sfusd)) %>%
-#   select(year, teacherpp, classifiedpp, opebpp) %>%
-#   pivot_longer(-year) %>%
-#   mutate(name=factor(name, 
-#                      levels=c("opebpp", "teacherpp", "classifiedpp"),
-#                      labels=c("total", "teachers", "classified"))) %>%
-#   ggplot(aes(year, value, colour=name)) +
-#   geom_line() +
-#   geom_point() +
-#   scale_x_continuous(name=NULL) +
-#   scale_y_continuous(name="$ per pupil", limits=c(0, NA)) +
-#   ggtitle(label="SFUSD nominal general fund OPEB expenditures on retirees, per pupil",
-#           subtitle="By pre-retirement job category") +
-#   theme_bw() +
-#   legend_notitle
-
-```
-
-
-```{r doc_opeb}
-
-# documentation on selected sacs codes ------------------------------------
-#.. 3101–3102 State Teachers’ Retirement System ----
-# State Teachers’ Retirement System. Record expenditures to provide personnel
-# with retirement benefits under the State Teachers’ Retirement System (STRS).
-# This excludes employee contributions. Object 3101 is certificated personnel in
-# STRS; Object 3102 includes those individuals who hold classified positions but
-# are enrolled in STRS.
-
-#.. 3201–3202 Public Employees’ Retirement System ----
-# Public Employees’ Retirement System. Record expenditures to provide personnel
-# with retirement benefits under the Public Employees’ Retirement System (PERS).
-# This excludes employee contributions, although it does include the employer’s
-# payment of an employee’s contribution. Object 3201 indicates those employees
-# in certificated positions and enrolled in PERS; Object 3202 indicates
-# employees in classified positions and enrolled in PERS.
-
-#.. 3401–3402 Health and Welfare Benefits ----
-# Health and Welfare Benefits. Record expenditures made to provide personnel
-# with health and welfare insurance benefits. This excludes employee
-# contributions but includes health and welfare benefit premiums paid to a
-# self-insurance fund. Object 3401 indicates that the benefits cover
-# certificated positions; Object 3402 indicates that the benefits cover
-# classified positions.
-
-
-#.. 3701 OPEB, Allocated, certificated positions ----
-# Expenditures (1) for retirees and other former employees for current-year
-# postemployment benefits other than pensions (OPEB) financed on a pay-as-you-go
-# basis; or (2) for the amounts paid to an OPEB plan (administered through a
-# qualifying trust) in excess of the current-year actuarially determined service
-# cost. A qualifying trust is a trust or an equivalent arrangement that meets
-# the criteria in paragraph 4 of GASB Statement 75. Do not include expenditures
-# for service costs for active employees; these must be direct-charged using
-# objects 3751–3752. Expenditures in objects 3701–3702 must be allocated to all
-# activities in proportion to total salaries or total full-time equivalents
-# (FTEs) in those activities. Object 3701 relates to certificated positions;
-# Object 3702 relates to classified positions.
-
-#.. 3702 OPEB, Allocated, classified positions ----
-# same text
-
-#.. 3751 OPEB, Active Employees, certificated positions ----
-# Expenditures for the amounts paid to a OPEB plan (administered through a
-# qualifying trust) up to the current-year actuarially determined service costs
-# for OPEB-eligible active employees. A qualifying trust is a trust or an
-# equivalent arrangement that meets the criteria in paragraph 4 of GASB
-# Statement 75. Do not include expenditures for retirees and other former
-# employees; these must be allocated using objects 3701–3702. Expenditures in
-# objects 3751–3752 must be direct-charged on a per-eligible-FTE basis to the
-# same resource, goal, and function as the OPEB-eligible active employee’s
-# salary. Object 3751 relates to certificated positions; Object 3752 relates to
-# classified positions.
-
-#.. 3752 OPEB, Active Employees, classified positions----
-# same text
-
-#.. 9664 Total/Net OPEB Liability ----
-# The total OPEB liability is the portion of the actuarial present value of
-# projected benefit payments that is attributed to past periods of employee
-# service, measured in conformity with the requirements of GASB Statement 75.
-# For a defined benefit OPEB plan that is not administered through a trust that
-# meets the criteria in paragraph 4 of GASB 75 (specified criteria), the total
-# OPEB liability is reported. For a defined benefit OPEB plan that is
-# administered through a trust that meets the specified criteria, a net OPEB
-# liability (that is, the total OPEB liability minus the OPEB plan’s fiduciary
-# net position) is reported. The total or net OPEB liability is reported only in
-# the LEA’s accrual-basis financial statements.
-
-# I don't bother to include 9664 because almost no districts report it.
-
-```
-
-
-
 # J-90 OPEB data
-```{r j90_doc}
-# TSAL517 File Contains the benefit information in Section VIII for retirees over 65
-# TSAL617 File Contains the benefit information in Section VIII for retirees 65 and under
-
-# TSAL517 and TSAL617 have essentially the same information. Here is TSAL617:
-# County Two digit county code
-# District Five digit district code
-# CDS Seven digit combined code
-# TS6_BenA one character code indicating type of benefit.  H for heath, D for dental, V for vision, L for life, O for other
-# TS6_Desc The name of the plan
-# TS6_Step The health benefit plans ID.  The first is always 1, the second and subsequent like plans are number consequently. This is calculated by the input program
-# TS6_Column A column 1 is always Single, 2 is two party plan, 3 is family plan, 4 is composite rate
-# TS6_Annual The annual cost of plan
-# TS6_Contr The amount the district contributes to the cost of the plan
-# TS6_FTE The number of retired teachers (age 65 or under) participating in the plan
-# TS6_ID number that is generated when a J-90 is submitted. Each record has an ID number
-
-# TS1_Maxcaf The maximum annual employer contributions to cafeteria plan.
-# TS1_Maxsin The maximum annual employer contributions to single plan per employee.
-# TS1_Maxtwo The maximum annual employer contributions to a two party plan per employee.
-# TS1_Maxfam The maximum annual employer contributions to a family plan per employee.
-# TS1_CAPTYPE Is the cap hard or soft or NA
-
-# Ben_life	Does district cover retirees for life? (Y/N)
-# Ben_stop	If not for life, when do benefits stop? Age or years
-# H_plan	Number of Health plans
-# D_plan	Number of dental plans
-# V_plan	Number of vision plans
-# L_plan	Number of life plans
-# O_plan	Number of other plans
-
-# County Two digit county code
-# District Five digit district code
-# CDS Seven digit combined code
-# TS6_BenA one character code indicating type of benefit.  H for heath, D for dental, V for vision, L for life, O for other
-# TS6_Desc The name of the plan
-# TS6_Step The health benefit plans ID.  The first is always 1, the second and subsequent like plans are number consequently. This is calculated by the input program
-# TS6_Column A column 1 is always Single, 2 is two party plan, 3 is family plan, 4 is composite rate
-# TS6_Annual The annual cost of plan
-# TS6_Contr The amount the district contributes to the cost of the plan
-# TS6_FTE The number of retired teachers (age 65 or under) participating in the plan
-# TS6_ID number that is generated when a J-90 is submitted. Each record has an ID number
-
-```
-
-```{r j90_faqs}
-# excerpts from the j90 faq
-
-# We have many benefit plans? Do I have to enter them all?
-#     You don’t have to enter any plans without FTEs. If you have too many and don’t want to deal with entering all of them, you can come up with some averages.
-
-
-# How do I enter my retiree plans? There are so many variables; how long they were at the district, the age they retired, etc. 	
-#     Come up with some averages. I don’t want you to have to enter twenty plus plans.
-
-# We don’t pay for our retirees. Do we still have to report them?
-# 	  No. We are only interested in what the district is paying. If they are just offering the plans but the retiree has to purchase them, you do not need to do that section.
-# --> seems to suggest that implicit subsidy will not appear here!!
-
-# Our district gives each FTE $9,000 to spend on any plans they want. Some FTEs will max out before dental and vision but then some take D & V first and then apply the rest to health. How do I show this?
-#     The easiest way is to enter the $9,000 on the cafeteria line where we ask for the caps. You will leave all district contributions blank. Our program will read that as everyone getting $9,000.
-
-
-
-```
 
 # REPORT: 4-panel plots and final table
+
 Data prep
+```{r set_j90data_year}
+#.. set_j90data_year ----
+j90data_year <- 2020  # rereun all 4-panel graph chunks and associated tables when this is changed
+
+```
+
 
 ```{r 4panelplot_and_final_table_prep}
 # get a list of all districts that offer OPEB health with values for agecat values
+
 opeb_dists <- opeb_j90 %>%
-  filter(plantype=="health", year==2020, eval(topada), opebfte > 0, agecat %in% c("under66", "age66p")) %>%
+  filter(plantype=="health", year==j90data_year, eval(topada), opebfte > 0, agecat %in% c("under66", "age66p")) %>%
   select(year, ccode, dcode, dname, plantype, k12ada) %>%
   distinct
 
@@ -1111,27 +875,32 @@ fctrs <- tribble(
 
 ```
 
-
 ## REPORT: 4-panel plots
+
 ```{r 4panel_prep}
 
 capt <- paste0("Source: ", j90_source)
 
+title_eecost <- paste0("Retiree portion of premium in ", j90data_year, ", averaged across district plans")
+title_ercost <- paste0("School district portion of premium in ", j90data_year, ", averaged across district plans")
+title_cost <- paste0("Total premium (district plus retiree portions) in ", j90data_year, ", averaged across district plans")
+
 params <- tribble(
   ~var, ~title, ~fnbase,
-  "toteecost", "Retiree portion of premium in 2020, averaged across district plans", "retshare",
-  "totercost", "School district portion of premium in 2020, averaged across district plans", "sdshare",
-  "totcost", "Total premium (district plus retiree portions) in 2020, averaged across district plans", "totshare"
+  "toteecost", title_eecost, "retshare",
+  "totercost", title_ercost, "sdshare",
+  "totcost", title_cost, "totshare"
   )
+
 
 ```
 
-
 ### REPORT: 4-panel plot with all districts that provide OPEB health premium subsidies
-```{r 4panel_allopeb, include=TRUE}
+
+```{r 4panel_allopeb, include=TRUE, fig.width=12, fig.height=8}
 subt <- "Certificated retirees, by age group. Includes districts, with at least 1,000 pupils, that provide\nhealth premium subsidies in either one of the age categories."
 # subt <- str_wrap(subt)
-suffix <- "_allopeb.png"
+suffix <- paste0("_allopeb_", j90data_year, ".png")
 
 pdata <- opeb_base %>%
   pivot_longer(cols=c(totcost, totercost, toteecost)) # average costs
@@ -1214,7 +983,7 @@ meansnew <- pdatanew %>%
   group_by(agecat, agecatf) %>% 
   summarise(n=n(), mean=mean(kfteada), .groups="drop")
 
-title <- "District-reported number of OPEB participants (FTE), shown per 1,000 pupils (calculated)"
+title <- paste0("District-reported number of OPEB participants (FTE) in ", j90data_year, ", shown per 1,000 pupils (calculated)")
 fname <- here::here("results", paste0("fteada_means", suffix))
   
 boostup <- 0.5
@@ -1257,7 +1026,7 @@ p_fte_mean <- pdatanew %>%
 
 p_fte_mean
 
-# ggsave(plot=p_fte_mean, filename=fname, width=8, height=8, units="in")
+ggsave(plot=p_fte_mean, filename=fname, width=8, height=8, units="in", scale=1.25)
 
 
 #.. combine plots ----
@@ -1267,12 +1036,12 @@ ggsave(plot=p, filename=here::here("results", paste0("combined_means", suffix)),
 
 ```
 
-
 ### REPORT APPENDIX: 4-panel plot including only districts that provide premium subsidy for an age category
-```{r 4panel_categoryopeb, include=TRUE}
+
+```{r 4panel_categoryopeb, include=TRUE, fig.width=12, fig.height=8}
 subt <- "Certificated retirees, by age group. Includes districts, with at least 1,000 pupils, that provide\nhealth premium subsidies in the given age category."
 # subt <- str_wrap(subt)
-suffix <- "_categoryopeb.png"
+suffix <- paste0("_categoryopeb_", j90data_year, ".png")
 
 pdata <- opeb_base %>%
   filter(opebfte > 0) %>%
@@ -1355,7 +1124,8 @@ meansnew <- pdatanew %>%
   group_by(agecat, agecatf) %>% 
   summarise(n=n(), mean=mean(kfteada), .groups="drop")
 
-title <- "District-reported number of OPEB participants (FTE), shown per 1,000 pupils (calculated)"
+title <- paste0("District-reported number of OPEB participants (FTE) in ", j90data_year, ", shown per 1,000 pupils (calculated)")
+
 fname <- here::here("results", paste0("fteada_means", suffix))
   
 boostup <- 0.5
@@ -1421,8 +1191,8 @@ ndists <- opeb_base %>%
 
 ```
 
-
 ### REPORT BODY: Final summary table including all OPEB districts in the age 65+ statistics
+
 ```{r plan_costs_ftes_means_allopeb, include=TRUE}
 # this version includes all districts regardless of whether they provide benefits in an age category
 distcosts <- opeb_base %>%
@@ -1465,7 +1235,7 @@ tab <- tabdata %>%
   group_by(agecatf) %>%
   gt() %>%
   tab_header(
-      title = paste0("Retiree health plan participants and premium costs"),
+      title = paste0("Retiree health plan participants and premium costs in ", j90data_year),
       subtitle = "Under 65 and Age 65+ retirees"
     ) %>%
   cols_label(
@@ -1523,12 +1293,123 @@ tab <- tabdata %>%
 
 tab  
 
-gtsave(tab, here::here("results", "j90_sfusd_vs_means_allopeb.png"))  # , zoom = 1.5, expand = 10)
-write_csv(tabdata, here::here("results", "j90_sfusd_vs_means_allopeb_data.csv"))
+fnbase <- paste0("table_j90_sfusd_vs_means_allopeb_", j90data_year)
+gtsave(tab, here::here("results", paste0(fnbase, ".png")))  # , zoom = 1.5, expand = 10)
+write_csv(tabdata, here::here("results", paste0(fnbase, "_data.csv")))
+
+```
+
+### REPORT BODY TABLE WITH DAVID CRANE's SORT: Final summary table including all OPEB districts in the age 65+ statistics
+
+```{r plan_costs_ftes_means_allopeb_cranesort, include=TRUE}
+# sorted by old group first
+# this version includes all districts regardless of whether they provide benefits in an age category
+distcosts <- opeb_base %>%
+  select(year, ccode, dcode, dname, agecat, agecatf, starts_with("tot")) %>%
+  pivot_longer(cols=c(totcost, totercost, toteecost))
+
+distftes <- opeb_base %>%
+  select(year, ccode, dcode, dname, agecat, agecatf, value=kfteada) %>%
+  mutate(name="kfteada")
+
+distvals <- bind_rows(distcosts, distftes) %>%
+  arrange(year, ccode, dcode, dname, agecat, name)
+
+sfusdvals <- distvals %>%
+  filter(eval(sfusd)) %>%
+  mutate(group="SFUSD")
+
+meanvals <- distvals %>%
+  group_by(agecat, agecatf, name) %>%
+  summarise(value=mean(value), .groups="drop") %>%
+  mutate(group="mean")
+
+vals <- c("kfteada")
+
+tabdata <- bind_rows(meanvals, sfusdvals) %>%
+  select(group, agecat, agecatf, name, value) %>%
+  pivot_wider() %>%
+  mutate(ershare=totercost / totcost) %>%
+  pivot_longer(cols=-c(group, agecat, agecatf)) %>%
+  pivot_wider(names_from = group) %>%
+  bind_rows(ndists %>% 
+              filter(tabletype=="opebdists") %>% 
+              select(-tabletype)) %>%
+  mutate(pctdiff=ifelse(name=="ershare", SFUSD - mean, SFUSD / mean - 1),
+         name=factor(name, levels=fctrs$lev, labels=fctrs$lab)) %>%
+  arrange(desc(agecat), name)
+
+tab <- tabdata %>%
+  select(-agecat) %>%
+  group_by(agecatf) %>%
+  gt() %>%
+  tab_header(
+      title = paste0("Retiree health plan participants and premium costs in ", j90data_year),
+      subtitle = "Age 65+ and Under 65 retirees"
+    ) %>%
+  cols_label(
+    name="",
+    mean=html("Mean across all<br>districts with<br>OPEB benefits"),
+    pctdiff=html("SFUSD %<br>above or<br>below mean")
+  ) %>%
+  cols_align(
+    align="left",
+    columns=name
+  ) %>%
+  fmt_currency(
+    columns = c(mean, SFUSD),
+    decimals = 0,
+    suffixing = FALSE
+  ) %>%
+  fmt_number(
+    columns=c(mean, SFUSD),
+    rows=c(1, 7),
+    decimals=1
+  ) %>%
+  fmt_number(
+    columns=c(mean, SFUSD),
+    rows=c(6, 12),
+    decimals=0
+  ) %>%
+  fmt_percent(
+    columns = c(mean, SFUSD),
+    rows=c(5, 11),
+    decimals = 1
+  ) %>%
+  fmt_percent(
+    columns = pctdiff,
+    decimals = 1
+  ) %>%
+  fmt_missing(columns = c(SFUSD, pctdiff)) %>%
+  cols_width(
+    c(mean, SFUSD, pctdiff) ~ px(160),
+    name ~ px(270)
+  ) %>%
+  tab_style(
+    style = list(
+      cell_fill(color = "grey90"),
+      cell_text(size = px(15), weight = "bold", font = "arial")
+      ),
+    locations = cells_row_groups()
+  ) %>%
+  tab_footnote(
+    footnote = "Calculated as SFUSD minus mean.",
+    locations = cells_body(
+      columns = pctdiff,
+      rows = str_detect(name, "%"))
+  ) %>%
+  tab_source_note(paste0("Source: ", j90_source))
+
+tab  
+
+fnbase <- paste0("table_j90_sfusd_vs_means_allopeb_cranesort", j90data_year)
+gtsave(tab, here::here("results", paste0(fnbase, ".png")))  # , zoom = 1.5, expand = 10)
+# gtsave(tab, here::here("results", "j90_sfusd_vs_means_allopeb_cranesort.png"))  # , zoom = 1.5, expand = 10)
 
 ```
 
 ### REPORT APPENDIX: Final summary table that limits age 65+ statistics to districts offering this coverage
+
 ```{r plan_costs_ftes_means_categoryopeb, include=TRUE}
 # this version includes only districts that provide benefits in an age category
 opeb_category <- opeb_base %>%
@@ -1572,7 +1453,7 @@ tab <- tabdata %>%
   group_by(agecatf) %>%
   gt() %>%
   tab_header(
-      title = paste0("Retiree health plan participants and premium costs"),
+      title = paste0("Retiree health plan participants and premium costs in ", j90data_year),
       "Under 65 and Age 65+ retirees"
     ) %>%
   cols_label(
@@ -1632,14 +1513,16 @@ tab <- tabdata %>%
 
 tab  
 
-gtsave(tab, here::here("results", "j90_sfusd_vs_means_categoryopeb.png"))  # , zoom = 1.5, expand = 10)
-write_csv(tabdata, here::here("results", "j90_sfusd_vs_means_categoryopeb_data.csv"))
+fnbase <- paste0("table_j90_sfusd_vs_means_categoryopeb_", j90data_year)
+gtsave(tab, here::here("results", paste0(fnbase, ".png")))  # , zoom = 1.5, expand = 10)
+write_csv(tabdata, here::here("results", paste0(fnbase, "_data.csv")))
+
 ```
 
-
-
 # REPORT SFUSD SPECIFIC PLANS
+
 ## JUST FOR HTML: SFUSD by plan type - cost and ftes
+
 ```{r plantype, include=TRUE}
 rows <- opeb_j90 %>%
   filter(eval(sfusd), year==2020, opebfte > 0) %>%
@@ -1708,6 +1591,7 @@ tabdata %>%
 ```
 
 # REPORT: Scatter of SFUSD health plans particpants and participant-cost
+
 ```{r sfusd_health_scatter, include=TRUE}
 pdata <- opeb_j90 %>%
   filter(eval(sfusd)) %>%
@@ -1745,11 +1629,10 @@ write_csv(pdata, here::here("results", "sfusd_plans_data.csv"))
 
 ```
 
-
-
 # REPORT SELECTED FACTS
 
 # District costs by whether district provides benefits for ages 65+
+
 ```{r}
 ben65p <- opeb_j90 %>%
   filter(year==2020) %>%
@@ -1815,28 +1698,10 @@ p
 ggsave(plot=p, filename=here::here("results", "opebpp_age_dots.png"), width=10, height=8, units="in")
 write_csv(pdata, here::here("results", "opebpp_age_dots_data.csv"))
 
-# p <- pdata %>%
-#   ggplot(aes(ben65p, opebpp)) +
-#   geom_boxplot(fill="slateblue", alpha=0.2, outlier.shape = NA, coef=0, notch=TRUE) +
-#   geom_point(colour="blue", data=sfusd_points, size=3) +
-#   geom_text(aes(label=label), data=sfusd_points, nudge_x = 0.2, colour="blue") +
-#   scale_y_continuous(name="Expenditures per pupil", 
-#                      breaks=seq(0, 700, 100), 
-#                      limits=c(0, 600), 
-#                      labels=label_comma(prefix="$")) +
-#   scale_x_discrete(name=NULL) +
-#   ggtitle("School district retiree health care expenditures per pupil",
-#           subtitle="By whether district provides benefits for age 65 and above") +
-#   labs(caption=capt) +
-#   theme_bw() +
-#   caption_left
-# p
-
 ```
 
-
-
 # NOT FOR REPORT OPEB costs by age
+
 ```{r costs_byage, include=FALSE}
 costs <- opeb_j90 %>%
   filter(eval(topada), plantype=="health", year==2020) %>%
@@ -1863,6 +1728,7 @@ opeb_j90 %>%
 ```
 
 # NOT FOR REPORT: SFUSD OPEB by age category
+
 ```{r include=TRUE}
 rows <- opeb_j90 %>%
   filter(eval(sfusd), year==2020, opebfte > 0, plantype=="health") %>%
@@ -1913,6 +1779,7 @@ tabdata %>%
 ```
 
 # REPORT: SFUSD cost shares table
+
 ```{r cost_shares, include=TRUE}
 topn <- 3
 srcnote <- paste0(j90_source, ", as reported by SFUSD.")
@@ -1979,7 +1846,7 @@ tab <- tabdata %>%
   gt() %>%
   cols_hide(c(group, agecat)) %>%
   tab_header(
-      title = "SFUSD health plans for certificated retirees",
+      title = "SFUSD health plans for certificated retirees in 2020",
       subtitle = "Three most-costly plans for SFUSD in each age category, plus All other"
     ) %>%
   cols_label(
@@ -2053,6 +1920,7 @@ write_csv(tabdata, here::here("results", "sfusd_opeb_top_plans_data.csv"))
 ```
 
 ## FACTS FOR REPORT TEXT: J90 districts providing benefits beyond age 65
+
 ```{r age65p_distpercents, include=TRUE}
 base <- opeb_j90 %>%
   select(year, ccode, dcode, dname, ben_life, ben_stop, agecat, k12ada, opebfte, starts_with("tot")) %>%
@@ -2112,7 +1980,9 @@ age65p_topada
 age65p_topadaopebfte
 
 ```
+
 ## FACTS FOR REPORT TEXT: J90 65+ costs as percent
+
 ```{r age65plus_costs, include=TRUE}
 base <- opeb_j90 %>%
   select(year, ccode, dcode, dname, ben_life, ben_stop, agecat, k12ada, opebfte, starts_with("tot")) %>%
@@ -2142,4 +2012,150 @@ costs %>%
 
 ```
 
+# DOCUMENTATION
 
+## SACS
+
+```{r doc_opeb}
+
+# documentation on selected sacs codes ------------------------------------
+#.. 3101–3102 State Teachers’ Retirement System ----
+# State Teachers’ Retirement System. Record expenditures to provide personnel
+# with retirement benefits under the State Teachers’ Retirement System (STRS).
+# This excludes employee contributions. Object 3101 is certificated personnel in
+# STRS; Object 3102 includes those individuals who hold classified positions but
+# are enrolled in STRS.
+
+#.. 3201–3202 Public Employees’ Retirement System ----
+# Public Employees’ Retirement System. Record expenditures to provide personnel
+# with retirement benefits under the Public Employees’ Retirement System (PERS).
+# This excludes employee contributions, although it does include the employer’s
+# payment of an employee’s contribution. Object 3201 indicates those employees
+# in certificated positions and enrolled in PERS; Object 3202 indicates
+# employees in classified positions and enrolled in PERS.
+
+#.. 3401–3402 Health and Welfare Benefits ----
+# Health and Welfare Benefits. Record expenditures made to provide personnel
+# with health and welfare insurance benefits. This excludes employee
+# contributions but includes health and welfare benefit premiums paid to a
+# self-insurance fund. Object 3401 indicates that the benefits cover
+# certificated positions; Object 3402 indicates that the benefits cover
+# classified positions.
+
+
+#.. 3701 OPEB, Allocated, certificated positions ----
+# Expenditures (1) for retirees and other former employees for current-year
+# postemployment benefits other than pensions (OPEB) financed on a pay-as-you-go
+# basis; or (2) for the amounts paid to an OPEB plan (administered through a
+# qualifying trust) in excess of the current-year actuarially determined service
+# cost. A qualifying trust is a trust or an equivalent arrangement that meets
+# the criteria in paragraph 4 of GASB Statement 75. Do not include expenditures
+# for service costs for active employees; these must be direct-charged using
+# objects 3751–3752. Expenditures in objects 3701–3702 must be allocated to all
+# activities in proportion to total salaries or total full-time equivalents
+# (FTEs) in those activities. Object 3701 relates to certificated positions;
+# Object 3702 relates to classified positions.
+
+#.. 3702 OPEB, Allocated, classified positions ----
+# same text
+
+#.. 3751 OPEB, Active Employees, certificated positions ----
+# Expenditures for the amounts paid to a OPEB plan (administered through a
+# qualifying trust) up to the current-year actuarially determined service costs
+# for OPEB-eligible active employees. A qualifying trust is a trust or an
+# equivalent arrangement that meets the criteria in paragraph 4 of GASB
+# Statement 75. Do not include expenditures for retirees and other former
+# employees; these must be allocated using objects 3701–3702. Expenditures in
+# objects 3751–3752 must be direct-charged on a per-eligible-FTE basis to the
+# same resource, goal, and function as the OPEB-eligible active employee’s
+# salary. Object 3751 relates to certificated positions; Object 3752 relates to
+# classified positions.
+
+#.. 3752 OPEB, Active Employees, classified positions----
+# same text
+
+#.. 9664 Total/Net OPEB Liability ----
+# The total OPEB liability is the portion of the actuarial present value of
+# projected benefit payments that is attributed to past periods of employee
+# service, measured in conformity with the requirements of GASB Statement 75.
+# For a defined benefit OPEB plan that is not administered through a trust that
+# meets the criteria in paragraph 4 of GASB 75 (specified criteria), the total
+# OPEB liability is reported. For a defined benefit OPEB plan that is
+# administered through a trust that meets the specified criteria, a net OPEB
+# liability (that is, the total OPEB liability minus the OPEB plan’s fiduciary
+# net position) is reported. The total or net OPEB liability is reported only in
+# the LEA’s accrual-basis financial statements.
+
+# I don't bother to include 9664 because almost no districts report it.
+
+```
+
+## J-90
+
+## J-90 documentation notes
+
+```{r j90_doc}
+# TSAL517 File Contains the benefit information in Section VIII for retirees over 65
+# TSAL617 File Contains the benefit information in Section VIII for retirees 65 and under
+
+# TSAL517 and TSAL617 have essentially the same information. Here is TSAL617:
+# County Two digit county code
+# District Five digit district code
+# CDS Seven digit combined code
+# TS6_BenA one character code indicating type of benefit.  H for heath, D for dental, V for vision, L for life, O for other
+# TS6_Desc The name of the plan
+# TS6_Step The health benefit plans ID.  The first is always 1, the second and subsequent like plans are number consequently. This is calculated by the input program
+# TS6_Column A column 1 is always Single, 2 is two party plan, 3 is family plan, 4 is composite rate
+# TS6_Annual The annual cost of plan
+# TS6_Contr The amount the district contributes to the cost of the plan
+# TS6_FTE The number of retired teachers (age 65 or under) participating in the plan
+# TS6_ID number that is generated when a J-90 is submitted. Each record has an ID number
+
+# TS1_Maxcaf The maximum annual employer contributions to cafeteria plan.
+# TS1_Maxsin The maximum annual employer contributions to single plan per employee.
+# TS1_Maxtwo The maximum annual employer contributions to a two party plan per employee.
+# TS1_Maxfam The maximum annual employer contributions to a family plan per employee.
+# TS1_CAPTYPE Is the cap hard or soft or NA
+
+# Ben_life	Does district cover retirees for life? (Y/N)
+# Ben_stop	If not for life, when do benefits stop? Age or years
+# H_plan	Number of Health plans
+# D_plan	Number of dental plans
+# V_plan	Number of vision plans
+# L_plan	Number of life plans
+# O_plan	Number of other plans
+
+# County Two digit county code
+# District Five digit district code
+# CDS Seven digit combined code
+# TS6_BenA one character code indicating type of benefit.  H for heath, D for dental, V for vision, L for life, O for other
+# TS6_Desc The name of the plan
+# TS6_Step The health benefit plans ID.  The first is always 1, the second and subsequent like plans are number consequently. This is calculated by the input program
+# TS6_Column A column 1 is always Single, 2 is two party plan, 3 is family plan, 4 is composite rate
+# TS6_Annual The annual cost of plan
+# TS6_Contr The amount the district contributes to the cost of the plan
+# TS6_FTE The number of retired teachers (age 65 or under) participating in the plan
+# TS6_ID number that is generated when a J-90 is submitted. Each record has an ID number
+
+```
+
+### J-90 FAQ excerpts
+
+```{r j90_faqs}
+# excerpts from the j90 faq
+
+# We have many benefit plans? Do I have to enter them all?
+#     You don’t have to enter any plans without FTEs. If you have too many and don’t want to deal with entering all of them, you can come up with some averages.
+
+
+# How do I enter my retiree plans? There are so many variables; how long they were at the district, the age they retired, etc. 	
+#     Come up with some averages. I don’t want you to have to enter twenty plus plans.
+
+# We don’t pay for our retirees. Do we still have to report them?
+# 	  No. We are only interested in what the district is paying. If they are just offering the plans but the retiree has to purchase them, you do not need to do that section.
+# --> seems to suggest that implicit subsidy will not appear here!!
+
+# Our district gives each FTE $9,000 to spend on any plans they want. Some FTEs will max out before dental and vision but then some take D & V first and then apply the rest to health. How do I show this?
+#     The easiest way is to enter the $9,000 on the cafeteria line where we ask for the caps. You will leave all district contributions blank. Our program will read that as everyone getting $9,000.
+
+```
