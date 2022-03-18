@@ -59,10 +59,10 @@ library(usmap)
 ```
 
 ```{r locations}
-dsacs <- r"(E:\data\CA_sacs/)"
+dsacs <- r"(E:\data\California\CA_sacs/)"
 dsacs_all <- paste0(dsacs, "data/allyears/")
 
-dj90 <- r"(E:\data\CA_j90/)"
+dj90 <- r"(E:\data\California\CA_j90/)"
 dj90_all <- paste0(dj90, "data/allyears/")
 
 ```
@@ -694,6 +694,12 @@ write_csv(pdata, here::here("results", "bayarea_ropebpp_data.csv"))
 
 ## REPORT: Bar chart of Bay Area opebpp
 ```{r bay_hbars}
+
+# pick one or the other of the two combinations below
+fnbase <- "bayarea_hbars"; clrs <- c("darkgreen", "blue")
+fnbase <- "bayarea_hbars_green"; clrs <- c("darkgreen", "darkgreen")
+
+
 # get plot data
 pdata <- baytop %>%
   filter(k12ada_rank <= topn) %>%
@@ -711,7 +717,7 @@ p <- pdata %>%
                      labels = scales::dollar_format(), 
                      breaks=seq(0, 1000, 100),
                      limits=c(0, 600)) +
-  scale_fill_manual(values=c("darkgreen", "blue")) +
+  scale_fill_manual(values=clrs) +
   # geom_vline(xintercept=mdn, linetype="solid", colour="darkgrey", size=1) +
   theme_bw() +
   theme(axis.text.y = element_text(hjust = 0)) +
@@ -721,8 +727,9 @@ p <- pdata %>%
   caption_left
 # +  annotate(geom="text", x=mdn + .1, y=5, label="median", hjust=0) 
 p
-ggsave(plot=p, filename=here::here("results", "bayarea_hbars.png"), width=10, height=6.5, units="in")
-write_csv(pdata, here::here("results", "bayarea_hbars_data.csv"))
+
+ggsave(plot=p, filename=here::here("results", paste0(fnbase, ".png")), width=10, height=6.5, units="in")
+write_csv(pdata, here::here("results", paste0(fnbase, "_data.csv")))
 
 ```
 
